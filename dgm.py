@@ -3,13 +3,9 @@ import time
 import pyautogui
 import numpy as np
 import cv2
-import random
 import keyboard
 import win32gui
 import win32con
-import mss
-from datetime import datetime
-import threading
 import sys
 from PyQt5.QtWidgets import (QApplication, QMainWindow, QLabel, QComboBox,
                            QPushButton, QVBoxLayout, QHBoxLayout,
@@ -102,17 +98,19 @@ def is_image_on_screen(image_path, confidence=0.85):
     location = pyautogui.locateCenterOnScreen(image_path, confidence=confidence)
     return location is not None
 
-def mover_mouse_humano(x_inicial, y_inicial, x_final, y_final):
-    """Move mouse in a human-like pattern"""
-    num_etapas = random.randint(10, 20)
+def mover_mouse_lento(x_inicial, y_inicial, x_final, y_final):
+    """Move mouse lentamente de um ponto a outro"""
+    # Define o número de etapas para o movimento
+    num_etapas = 100  # Você pode ajustar esse número conforme necessário
     x_step = (x_final - x_inicial) / num_etapas
     y_step = (y_final - y_inicial) / num_etapas
-
-    for i in range(num_etapas):
-        x = int(x_inicial + x_step * i + random.randint(-3, 3))
-        y = int(y_inicial + y_step * i + random.randint(-3, 3))
-        pyautogui.moveTo(x, y, duration=random.uniform(0.05, 0.1))
-        time.sleep(random.uniform(0.01, 0.03))
+    
+    for i in range(num_etapas + 1):  # Inclui o ponto final
+        xi = int(x_inicial + x_step * i)
+        yi = int(y_inicial + y_step * i)
+        pyautogui.moveTo(xi, yi, duration=0.01)  # Duração fixa para cada movimento
+        time.sleep(0.01)
+    pyautogui.mouseUp(x=xi, y=yi)
 
 def calcular_area_homogenea(quadrado):
     """Calculate homogeneous area in a square"""
@@ -120,7 +118,7 @@ def calcular_area_homogenea(quadrado):
     unique_pixels, counts = np.unique(pixels, axis=0, return_counts=True)
     return max(counts)
 
-def dividir_e_desenhar_contornos():
+def dividir_e_desenhar_contornos():    
     """Process captcha by dividing and drawing contours"""
     left = min(int(COORDINATES['x_inicial']), int(COORDINATES['x_final'])) 
     top = min(int(COORDINATES['y_inicial']), int(COORDINATES['y_final']))
@@ -130,7 +128,8 @@ def dividir_e_desenhar_contornos():
     screenshot = pyautogui.screenshot(region=(left, top, width, height))
     image = np.array(screenshot)
     image = cv2.cvtColor(image, cv2.COLOR_RGB2BGR)
-
+    cv2.imwrite("CaptchaSolution\\screenshot.png", image)
+    
     altura, largura, _ = image.shape
     tamanho_quadrado_largura = largura // 8
     tamanho_quadrado_altura = altura // 8
@@ -155,7 +154,7 @@ def dividir_e_desenhar_contornos():
     if quadrado_mais_homogeneo:
         x_inicio, y_inicio, x_fim, y_fim = quadrado_mais_homogeneo
         quadrado_azul = image[y_inicio:y_fim, x_inicio:x_fim]
-        temp_image_path = "quadrado_azul.png"
+        temp_image_path = "CaptchaSolution\\quadrado_azul.png"
         cv2.imwrite(temp_image_path, quadrado_azul)
         
         location = pyautogui.locateCenterOnScreen(temp_image_path, confidence=0.85)
@@ -164,8 +163,7 @@ def dividir_e_desenhar_contornos():
             x_inicial, y_inicial = 296, 438 # centro do objeto a ser arrastado do captcha
 
             pyautogui.mouseDown(x=x_inicial, y=y_inicial)
-            mover_mouse_humano(x_inicial, y_inicial, x_final, y_final)
-            pyautogui.mouseUp(x=x_final, y=y_final)
+            mover_mouse_lento(x_inicial, y_inicial, x_final, y_final)
             
             log(f"Mouse movido para o quadrado azul.")
             time.sleep(5)
@@ -494,7 +492,6 @@ class MainWindow(QMainWindow):
             padding: 10px;
             margin: 5px;
             border-radius: 10px;
-            box-shadow: 2px 2px 5px lightgray;
         """)
         
         card_layout = QVBoxLayout(card)
@@ -690,7 +687,7 @@ class MainWindow(QMainWindow):
                 if keyboard.is_pressed('r'):
                     log(f"Bot encerrado. Tempo de execução: {elapsed_time_str}")
                     break
-                    
+                
                 if is_image_on_screen(IMAGE_PATHS['captcha_exists']):
                     dividir_e_desenhar_contornos()
                     
