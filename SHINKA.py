@@ -27,10 +27,10 @@ SCREENSHOTS_DIR = "ScreenSaved"
 
 # Screen coordinates
 COORDINATES = {
-    'x_inicial': '540',
-    'y_inicial': '239',
-    'x_final': '825',
-    'y_final': '525'
+    'x_inicial': '282', # ponta de cima do captcha
+    'y_inicial': '183', # ponta de cima do captcha
+    'x_final': '514', # ponta de baixo do captcha
+    'y_final': '413' # ponta de baixo do captcha
 }
 
 # Image paths
@@ -122,7 +122,7 @@ def calcular_area_homogenea(quadrado):
 
 def dividir_e_desenhar_contornos():
     """Process captcha by dividing and drawing contours"""
-    left = min(int(COORDINATES['x_inicial']), int(COORDINATES['x_final']))
+    left = min(int(COORDINATES['x_inicial']), int(COORDINATES['x_final'])) 
     top = min(int(COORDINATES['y_inicial']), int(COORDINATES['y_final']))
     width = abs(int(COORDINATES['x_final']) - int(COORDINATES['x_inicial']))
     height = abs(int(COORDINATES['y_final']) - int(COORDINATES['y_inicial']))
@@ -161,7 +161,7 @@ def dividir_e_desenhar_contornos():
         location = pyautogui.locateCenterOnScreen(temp_image_path, confidence=0.85)
         if location:
             x_final, y_final = location
-            x_inicial, y_inicial = 555, 554
+            x_inicial, y_inicial = 296, 438 # centro do objeto a ser arrastado do captcha
 
             pyautogui.mouseDown(x=x_inicial, y=y_inicial)
             mover_mouse_humano(x_inicial, y_inicial, x_final, y_final)
@@ -444,7 +444,7 @@ class MainWindow(QMainWindow):
         digievolucao_layout.addWidget(label_digievolucao)
 
         self.digievolucao_combobox = QComboBox()
-        self.digievolucao_combobox.addItems(["rookie", "champion", "ultimate", "mega"])
+        self.digievolucao_combobox.addItems(["mega", "ultimate", "champion", "rookie"])
         self.digievolucao_combobox.setFixedWidth(100)
         self.digievolucao_combobox.currentIndexChanged.connect(self.atualizar_digievolucao)
         digievolucao_layout.addWidget(self.digievolucao_combobox)
@@ -636,6 +636,8 @@ class MainWindow(QMainWindow):
 
         start_time = time.time()
         while True:
+            if is_image_on_screen(IMAGE_PATHS['captcha_exists']):
+                dividir_e_desenhar_contornos()
             elapsed_time = time.time() - start_time
             elapsed_hours = int(elapsed_time // 3600)
             elapsed_minutes = int((elapsed_time % 3600) // 60)

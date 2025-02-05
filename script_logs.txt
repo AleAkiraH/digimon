@@ -54,3 +54,79 @@
 [2025-02-05 02:04:45] Buscando imagem de inicio de batalha
 [2025-02-05 02:04:46] Imagem de início de batalha detectada.
 [2025-02-05 02:04:47] Procurando batalha: pressionando 'F'.
+[2025-02-05 02:54:00] Automação principal em execução...
+[2025-02-05 02:54:05] Tela de digimons aberta...
+[2025-02-05 02:54:51] Automação principal em execução...
+[2025-02-05 02:54:55] Tela de digimons aberta...
+[2025-02-05 02:54:57] Buscando imagem de inicio de batalha
+[2025-02-05 02:54:59] Imagem de início de batalha detectada.
+[2025-02-05 02:55:00] Procurando batalha: pressionando 'F'.
+[2025-02-05 02:55:46] Automação principal em execução...
+[2025-02-05 02:55:51] Tela de digimons aberta...
+[2025-02-05 02:55:53] Buscando imagem de inicio de batalha
+[2025-02-05 02:55:55] Imagem de início de batalha detectada.
+[2025-02-05 02:55:56] Procurando batalha: pressionando 'F'.
+[2025-02-05 02:56:16] Batalha iniciada.
+[2025-02-05 02:56:17] Executando ações de batalha.
+[2025-02-05 02:56:31] Batalha finalizada.
+[2025-02-05 02:56:31] Aguardando para iniciar uma nova batalha.
+[2025-02-05 02:56:36] Automação principal em execução...
+[2025-02-05 02:56:40] Tela de digimons aberta...
+[2025-02-05 02:56:46] Imagem de inicio de batalha não encontrada.
+[2025-02-05 02:56:47] Buscando imagem de inicio de batalha
+[2025-02-05 02:56:50] Digivolução retirada.
+[2025-02-05 02:56:55] Digivolução aplicada.
+[2025-02-05 02:56:59] Refill concluído.
+[2025-02-05 02:56:59] Automação principal em execução...
+[2025-02-05 02:57:03] Tela de digimons aberta...
+[2025-02-05 02:57:05] Buscando imagem de inicio de batalha
+[2025-02-05 02:57:06] Imagem de início de batalha detectada.
+[2025-02-05 02:57:07] Procurando batalha: pressionando 'F'.
+[2025-02-05 02:57:30] Batalha iniciada.
+[2025-02-05 02:57:31] Executando ações de batalha.
+[2025-02-05 02:57:33] Batalha finalizada.
+[2025-02-05 02:57:33] Aguardando para iniciar uma nova batalha.
+[2025-02-05 02:57:37] Automação principal em execução...
+[2025-02-05 02:57:41] Tela de digimons aberta...
+[2025-02-05 02:57:43] Buscando imagem de inicio de batalha
+[2025-02-05 02:57:43] Imagem de início de batalha detectada.
+[2025-02-05 02:57:44] Procurando batalha: pressionando 'F'.
+[2025-02-05 02:57:59] Batalha iniciada.
+[2025-02-05 02:57:59] Executando ações de batalha.
+[2025-02-05 02:58:00] Batalha finalizada.
+[2025-02-05 02:58:00] Aguardando para iniciar uma nova batalha.
+[2025-02-05 02:58:31] Automação principal em execução...
+[2025-02-05 02:58:34] Tela de digimons aberta...
+[2025-02-05 02:58:36] Buscando imagem de inicio de batalha
+[2025-02-05 02:58:37] Imagem de início de batalha detectada.
+[2025-02-05 02:58:38] Procurando batalha: pressionando 'F'.
+[2025-02-05 02:58:49] Batalha iniciada.
+[2025-02-05 02:58:49] Executando ações de batalha.
+[2025-02-05 02:58:50] Batalha finalizada.
+[2025-02-05 02:58:50] Aguardando para iniciar uma nova batalha.
+[2025-02-05 02:59:25] Automação principal em execução...
+[2025-02-05 02:59:29] Tela de digimons aberta...
+[2025-02-05 02:59:34] Imagem de inicio de batalha não encontrada.
+[2025-02-05 02:59:35] Buscando imagem de inicio de batalha
+[2025-02-05 03:00:03] Automação principal em execução...
+[2025-02-05 03:00:07] Tela de digimons aberta...
+[2025-02-05 03:00:08] Buscando imagem de inicio de batalha
+[2025-02-05 03:00:09] Imagem de início de batalha detectada.
+[2025-02-05 03:00:10] Procurando batalha: pressionando 'F'.
+[2025-02-05 03:00:39] Batalha iniciada.
+[2025-02-05 03:00:40] Executando ações de batalha.
+[2025-02-05 03:00:40] Batalha finalizada.
+[2025-02-05 03:00:41] Aguardando para iniciar uma nova batalha.
+[2025-02-05 03:00:54] Automação principal em execução...
+[2025-02-05 03:00:59] Tela de digimons aberta...
+[2025-02-05 03:01:07] Imagem de inicio de batalha não encontrada.
+[2025-02-05 03:01:08] Buscando imagem de inicio de batalha
+[2025-02-05 03:02:40] Automação principal em execução...
+[2025-02-05 03:02:43] Mouse movido para o quadrado azul.
+[2025-02-05 10:22:12] Mouse movido para o quadrado azul.
+[2025-02-05 10:22:17] Automação principal em execução...
+[2025-02-05 10:22:20] Mouse movido para o quadrado azul.
+[2025-02-05 10:23:18] Mouse movido para o quadrado azul.
+[2025-02-05 10:23:23] Automação principal em execução...
+[2025-02-05 10:23:27] Mouse movido para o quadrado azul.
+[2025-02-05 10:23:37] Tela de digimons aberta...
