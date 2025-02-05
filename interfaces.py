@@ -25,7 +25,7 @@ class AutomationThread(QThread):
         self.is_running = True
         self.is_paused = False
         
-    def run(self):
+    def run(self):   
         start_time = time.time()
         while self.is_running:
             if self.is_paused:
@@ -431,6 +431,7 @@ class MainWindow(QMainWindow):
                 background-color: #45a049;
             }
         """)
+        self.start_button.clicked.connect(self.escolher_resolucao)
         self.start_button.clicked.connect(self.toggle_automation)
         buttons_layout.addWidget(self.start_button)
         
@@ -576,31 +577,7 @@ class MainWindow(QMainWindow):
 
     def update_status(self, message):
         self.status_label.setText(f"Status: {message}")
-
-    def run_automation_cycle(self, start_time):
-        # Move the automation logic from executar_script here
-        # This is the same code as before, just moved to a new method
-        if is_image_on_screen(IMAGE_PATHS['captcha_exists']):
-            dividir_e_desenhar_contornos()
-        
-        elapsed_time = time.time() - start_time
-        elapsed_hours = int(elapsed_time // 3600)
-        elapsed_minutes = int((elapsed_time % 3600) // 60)
-        elapsed_seconds = int(elapsed_time % 60)
-        elapsed_time_str = f"{elapsed_hours:02}:{elapsed_minutes:02}:{elapsed_seconds:02}"
-
-        log("Automação principal em execução...")
-        
-        for _ in range(3):
-            if is_image_on_screen(IMAGE_PATHS['captcha_exists']):
-                dividir_e_desenhar_contornos()
-        
-        time.sleep(1)
-        for _ in range(4):
-            pyautogui.press('g')
-        pyautogui.press('v')
-        time.sleep(1)
-        
+       
     def setup_resolution_config(self, layout):
         config_layout = QHBoxLayout()
         layout.addLayout(config_layout)
@@ -856,89 +833,3 @@ class MainWindow(QMainWindow):
             QMessageBox.information(self, "Sucesso", "Login realizado com sucesso!")
         else:
             QMessageBox.warning(self, "Erro", "Credenciais inválidas!")
-
-    def executar_script(self):
-        if not self.is_authenticated:
-            QMessageBox.warning(self, "Erro", "Por favor, autentique-se primeiro!")
-            return
-
-        start_time = time.time()
-        while True:
-            if is_image_on_screen(IMAGE_PATHS['captcha_exists']):
-                dividir_e_desenhar_contornos()
-            elapsed_time = time.time() - start_time
-            elapsed_hours = int(elapsed_time // 3600)
-            elapsed_minutes = int((elapsed_time % 3600) // 60)
-            elapsed_seconds = int(elapsed_time % 60)
-            elapsed_time_str = f"{elapsed_hours:02}:{elapsed_minutes:02}:{elapsed_seconds:02}"
-
-            log("Automação principal em execução...")
-            
-            for _ in range(3):
-                if is_image_on_screen(IMAGE_PATHS['captcha_exists']):
-                    dividir_e_desenhar_contornos()
-            
-            time.sleep(1)
-            for _ in range(4):
-                pyautogui.press('g')
-            pyautogui.press('v')
-            time.sleep(1)
-
-            if is_image_on_screen(IMAGE_PATHS['captcha_exists']):
-                dividir_e_desenhar_contornos()
-            
-            log("Tela de digimons aberta...")
-            if is_image_on_screen(IMAGE_PATHS['evp_terminado']):
-                location = pyautogui.locateCenterOnScreen(IMAGE_PATHS['evp_terminado'], confidence=0.97)
-                if location:
-                    x, y = location
-                    pyautogui.click(x, y)
-                    time.sleep(0.5)
-                    pyautogui.press('e')
-
-            battle_start_image_HP_Try = 3
-            while not is_image_on_screen(IMAGE_PATHS['battle_start_hp']):
-                if is_image_on_screen(IMAGE_PATHS['captcha_exists']):
-                    dividir_e_desenhar_contornos()
-                if battle_start_image_HP_Try == 0:
-                    log("Imagem de inicio de batalha não encontrada.")
-                    if not is_image_on_screen(IMAGE_PATHS['janela_digimon']):
-                        pyautogui.press('v')                        
-                    break
-                battle_start_image_HP_Try -= 1
-                time.sleep(1)
-
-            time.sleep(1)
-            log("Buscando imagem de inicio de batalha")
-            
-            if all(is_image_on_screen(IMAGE_PATHS[img]) for img in ['battle_start_hp', 'battle_start_sp', 'battle_start_evp']):
-                log("Imagem de início de batalha detectada.")                
-                pyautogui.press('i')
-                
-                if keyboard.is_pressed('r'):
-                    log(f"Bot encerrado. Tempo de execução: {elapsed_time_str}")
-                    break
-                
-                if is_image_on_screen(IMAGE_PATHS['captcha_exists']):
-                    dividir_e_desenhar_contornos()
-                    
-                initiate_battle(IMAGE_PATHS['battle_detection'], self.battle_keys)
-                
-                if is_image_on_screen(IMAGE_PATHS['captcha_exists']):
-                    dividir_e_desenhar_contornos()
-                    
-                battle_actions(IMAGE_PATHS['battle_detection'], IMAGE_PATHS['battle_finish'], self.battle_keys)
-                
-                if is_image_on_screen(IMAGE_PATHS['captcha_exists']):
-                    dividir_e_desenhar_contornos()
-            else:
-                if not is_image_on_screen(IMAGE_PATHS['battle_start_evp']):
-                    pyautogui.press('v')
-                    for _ in range(35):
-                        if is_image_on_screen(IMAGE_PATHS['captcha_exists']):
-                            dividir_e_desenhar_contornos()
-                        pyautogui.press('5')
-                        time.sleep(0.5)                       
-                    pyautogui.press('v')
-                refill_digimons(self.digievolucao_combobox.currentText())
-
