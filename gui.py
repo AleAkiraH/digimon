@@ -4,7 +4,7 @@ import win32con
 from PyQt5.QtWidgets import (QApplication, QMainWindow, QLabel, QComboBox,
                              QPushButton, QVBoxLayout, QHBoxLayout,
                              QWidget, QMessageBox, QFrame,
-                             QSizePolicy, QTabWidget)
+                             QSizePolicy, QTabWidget, QGroupBox)
 from PyQt5.QtGui import QPixmap, QImage
 from PyQt5.QtCore import Qt
 from PIL import ImageGrab
@@ -13,9 +13,33 @@ import os
 
 # Resolução padrão usada como referência
 RESOLUCAO_PADRAO = (800, 600)
-
 # Diretório para salvar as imagens capturadas
 SCREENSHOTS_DIR = "ScreenSaved"
+# Variável global para armazenar as coordenadas da digievolução
+digievolucao_coordenadas = {}
+# Mapeamento das coordenadas para cada digievolução
+digievolucoes = {
+    "rookie": [
+        [[484, 254], [731, 248], [730, 269]],
+        [[484, 294], [731, 248], [730, 269]],
+        [[484, 340], [731, 248], [730, 269]]
+    ],
+    "champion": [
+        [[484, 254], [731, 248], [730, 271]],
+        [[484, 294], [731, 248], [730, 271]],
+        [[484, 340], [731, 248], [730, 271]]
+    ],
+    "ultimate": [
+        [[484, 254], [731, 248], [730, 291]],
+        [[484, 294], [731, 248], [730, 291]],
+        [[484, 340], [731, 248], [730, 291]]
+    ],
+    "mega": [
+        [[484, 254], [731, 248], [730, 311]],
+        [[484, 294], [731, 248], [730, 311]],
+        [[484, 340], [731, 248], [730, 311]]
+    ]
+}
 
 class MainWindow(QMainWindow):
     def __init__(self):
@@ -23,23 +47,23 @@ class MainWindow(QMainWindow):
         self.setWindowTitle("Digimon Info")
         self.setGeometry(100, 100, 400, 600)
         self.setStyleSheet("background-color: white; color: black;")
-
+        
         # Widget central e layout principal
         self.central_widget = QWidget()
         self.central_widget.setStyleSheet("background-color: white;")
         self.setCentralWidget(self.central_widget)
         self.layout = QVBoxLayout(self.central_widget)
         self.layout.setAlignment(Qt.AlignTop)
-
+        
         # Tab widget
         self.tabs = QTabWidget()
         self.layout.addWidget(self.tabs)
-
+        
         # Tab "Jogar"
         self.tab_jogar = QWidget()
         self.tabs.addTab(self.tab_jogar, "Jogar")
         self.layout_jogar = QVBoxLayout(self.tab_jogar)
-
+        
         # Título
         title_label = QLabel("Bem-vindo ao projeto TERAS")
         title_label.setStyleSheet("font-size: 20px; font-weight: bold; color: #4682B4;")
@@ -69,18 +93,42 @@ class MainWindow(QMainWindow):
 
         # Label para Resolução do Jogo
         self.label_resolucao = QLabel("Resolução do Jogo:")
+        self.label_resolucao.setFixedWidth(120)  # Define uma largura fixa para a label, se necessário
         self.config_layout.addWidget(self.label_resolucao)
 
         # Combobox para selecionar a resolução
         self.resolucoes = ["800x600", "1024x768"]
         self.resolucao_combobox = QComboBox()
         self.resolucao_combobox.addItems(self.resolucoes)
+
+        # Define uma largura fixa para a combobox, se necessário
+        self.resolucao_combobox.setFixedWidth(100)  # Ajuste o valor conforme necessário
         self.config_layout.addWidget(self.resolucao_combobox)
 
-        # Botão para definir a resolução
-        self.botao_definir = QPushButton("Definir")
-        self.botao_definir.clicked.connect(self.escolher_resolucao)
-        self.config_layout.addWidget(self.botao_definir)
+        # Conectando o sinal para definir a resolução automaticamente
+        self.resolucao_combobox.currentIndexChanged.connect(self.escolher_resolucao)        
+
+        # Adicionando a QLabel e QComboBox para Digievolução na aba Configurar
+        self.label_digievolucao = QLabel("Digievolução:")
+
+        # Cria um layout horizontal para a label e a combobox de digievolução
+        digievolucao_layout = QHBoxLayout()
+        digievolucao_layout.setSpacing(5)  # Define um espaçamento pequeno entre os widgets
+        self.layout_configurar.addLayout(digievolucao_layout)
+
+        self.label_digievolucao = QLabel("Digievolução:")
+        self.label_digievolucao.setFixedWidth(100)  # Define uma largura fixa para a label, se necessário
+
+        self.digievolucao_combobox = QComboBox()
+        self.digievolucao_combobox.addItems(["rookie", "champion", "ultimate", "mega"])
+        self.digievolucao_combobox.currentIndexChanged.connect(self.atualizar_digievolucao)
+
+        # Define uma largura fixa para a combobox
+        self.digievolucao_combobox.setFixedWidth(100)  # Altere o valor conforme necessário
+
+        # Adiciona a label e a combobox ao layout horizontal
+        digievolucao_layout.addWidget(self.label_digievolucao)
+        digievolucao_layout.addWidget(self.digievolucao_combobox)
 
         # Mensagem informativa
         self.mensagem_info = QLabel("Certifique-se de que a tela de informações do Digimon está aberta!")
@@ -95,7 +143,6 @@ class MainWindow(QMainWindow):
             "janela_digimon.png",
             "battle_detection.png"
         ]
-
         self.coordenadas = [
             (503, 377, 596, 393),
             (503, 417, 563, 433),
@@ -125,36 +172,37 @@ class MainWindow(QMainWindow):
         # Carrega as imagens existentes
         self.carregar_imagens()
 
+    def atualizar_digievolucao(self):
+        global digievolucao_coordenadas
+        # Atualiza a variável global com base na seleção da ComboBox
+        digievolucao = self.digievolucao_combobox.currentText()
+        digievolucao_coordenadas = digievolucoes.get(digievolucao, [])
+        print(f"Digievolução selecionada: {digievolucao}, Coordenadas: {digievolucao_coordenadas}")
+
     def create_card(self, index):
         # Card Frame
         card = QFrame()
         card.setStyleSheet("background-color: #4682B4; color: white; border: 1px solid lightgray; padding: 10px; margin: 5px; border-radius: 10px; box-shadow: 2px 2px 5px lightgray;")
         card_layout = QVBoxLayout(card)
-
         # Título da imagem
         title = QLabel(f"{index + 1} - " + self.get_title(index))
         title.setStyleSheet("font-size: 10px;")
         card_layout.addWidget(title)
-
         # Layout vertical para a imagem e o botão
         image_button_layout = QVBoxLayout()
         image_button_layout.setAlignment(Qt.AlignCenter)
-
         # Label para exibir a imagem
         label = QLabel(self)
         label.setFixedSize(150, 100)  # Define um tamanho fixo para todas as imagens
         label.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed)
         label.setAlignment(Qt.AlignCenter)  # Centraliza a imagem no label
         image_button_layout.addWidget(label)
-
         # Botão para capturar a imagem
         botao_captura = QPushButton("Capturar")
         botao_captura.setStyleSheet("font-size: 10px; background-color: #4682B4; color: white; border-radius: 5px;")
         botao_captura.clicked.connect(lambda checked, idx=index: self.capturar_imagem(idx))
         image_button_layout.addWidget(botao_captura)
-
         card_layout.addLayout(image_button_layout)
-
         # Armazenar o label no card para fácil acesso
         card.label = label
         return card
@@ -192,27 +240,23 @@ class MainWindow(QMainWindow):
             return None
         resolucao_selecionada = self.resolucao_combobox.currentText()
         largura, altura = map(int, resolucao_selecionada.split("x"))
-       # Calcula a escala com base na resolução
+        # Calcula a escala com base na resolução
         proporcao_x = largura / RESOLUCAO_PADRAO[0]
         proporcao_y = altura / RESOLUCAO_PADRAO[1]
-
         # Ajusta as coordenadas para a nova resolução
         x_inicio = int(x_inicio * proporcao_x)
         y_inicio = int(y_inicio * proporcao_y)
         x_fim = int(x_fim * proporcao_x)
         y_fim = int(y_fim * proporcao_y)
-
         # Obtém a posição da janela do jogo
         rect = win32gui.GetWindowRect(hwnd)
         client_rect = win32gui.GetClientRect(hwnd)
         x_tela, y_tela = win32gui.ClientToScreen(hwnd, (client_rect[0], client_rect[1]))
-
         # Ajusta as coordenadas para a tela
         x_inicio += x_tela
         y_inicio += y_tela
         x_fim += x_tela
         y_fim += y_tela
-
         # Captura a tela na área especificada
         try:
             screenshot = ImageGrab.grab(bbox=(x_inicio, y_inicio, x_fim, y_fim))
@@ -229,7 +273,6 @@ class MainWindow(QMainWindow):
             imagem = QImage.fromData(imagem_data)
             pixmap = QPixmap(imagem)
             self.cards[index].label.setPixmap(pixmap)
-
             # Salvar a imagem no diretório SCREENSHOTS_DIR com os nomes corretos
             filename = os.path.join(SCREENSHOTS_DIR, self.image_filenames[index])
             hwnd = win32gui.FindWindow(None, 'Digimon SuperRumble  ')
@@ -238,21 +281,18 @@ class MainWindow(QMainWindow):
                 return
             resolucao_selecionada = self.resolucao_combobox.currentText()
             largura, altura = map(int, resolucao_selecionada.split("x"))
-           # Calcula a escala com base na resolução
+            # Calcula a escala com base na resolução
             proporcao_x = largura / RESOLUCAO_PADRAO[0]
             proporcao_y = altura / RESOLUCAO_PADRAO[1]
-
             # Ajusta as coordenadas para a nova resolução
             x_inicio = int(self.coordenadas[index][0] * proporcao_x)
             y_inicio = int(self.coordenadas[index][1] * proporcao_y)
             x_fim = int(self.coordenadas[index][2] * proporcao_x)
             y_fim = int(self.coordenadas[index][3] * proporcao_y)
-
             # Obtém a posição da janela do jogo
             rect = win32gui.GetWindowRect(hwnd)
             client_rect = win32gui.GetClientRect(hwnd)
             x_tela, y_tela = win32gui.ClientToScreen(hwnd, (client_rect[0], client_rect[1]))
-
             # Ajusta as coordenadas para a tela
             x_inicio += x_tela
             y_inicio += y_tela
