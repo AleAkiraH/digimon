@@ -1,16 +1,16 @@
-import os
-import time
+import sys
+from PyQt5.QtWidgets import QApplication, QMainWindow, QMessageBox, QVBoxLayout, QHBoxLayout, QWidget, QLabel, QPushButton, QComboBox, QGroupBox, QTabWidget, QLineEdit, QScrollArea, QFrame
+from PyQt5.QtCore import Qt, QThread, pyqtSignal
+from PyQt5.QtGui import QPixmap, QImage
+
 import pyautogui
+import time
+import keyboard
 import win32gui
 import win32con
-from PyQt5.QtWidgets import (QApplication, QMainWindow, QLabel, QComboBox,
-                           QPushButton, QVBoxLayout, QHBoxLayout,
-                           QWidget, QMessageBox, QFrame,
-                           QSizePolicy, QTabWidget, QGroupBox, QLineEdit, QScrollArea)
-from PyQt5.QtGui import QPixmap, QImage, QPainter, QColor, QLinearGradient, QFont
-from PyQt5.QtCore import Qt, QSize, QThread, pyqtSignal
+import os
 from PIL import ImageGrab
-import io, keyboard
+import io
 
 # Importe as funções e variáveis necessárias dos outros arquivos
 from variables import WINDOW_NAME, RESOLUCAO_PADRAO, SCREENSHOTS_DIR, IMAGE_PATHS, APP_STATES
@@ -18,13 +18,13 @@ from functions import log, is_image_on_screen, dividir_e_desenhar_contornos, ini
 
 class AutomationThread(QThread):
     status_update = pyqtSignal(str)
-
+    
     def __init__(self, main_window):
         super().__init__()
         self.main_window = main_window
         self.is_running = True
         self.is_paused = False
-
+        
     def run(self):
         start_time = time.time()
         while self.is_running:
@@ -33,21 +33,103 @@ class AutomationThread(QThread):
                 continue
 
             try:
-                self.main_window.run_automation_cycle(start_time)
+                if is_image_on_screen(IMAGE_PATHS['captcha_exists']):
+                    dividir_e_desenhar_contornos()
+                
+                elapsed_time = time.time() - start_time
+                elapsed_hours = int(elapsed_time // 3600)
+                elapsed_minutes = int((elapsed_time % 3600) // 60)
+                elapsed_seconds = int(elapsed_time % 60)
+                elapsed_time_str = f"{elapsed_hours:02}:{elapsed_minutes:02}:{elapsed_seconds:02}"
+
+                self.status_update.emit("Automação principal em execução...")
+                
+                for _ in range(3):
+                    if is_image_on_screen(IMAGE_PATHS['captcha_exists']):
+                        dividir_e_desenhar_contornos()
+                
+                time.sleep(1)
+                for _ in range(4):
+                    pyautogui.press('g')
+                pyautogui.press('v')
+                time.sleep(1)
+
+                if is_image_on_screen(IMAGE_PATHS['captcha_exists']):
+                    dividir_e_desenhar_contornos()
+                
+                self.status_update.emit("Tela de digimons aberta...")
+                if is_image_on_screen(IMAGE_PATHS['evp_terminado']):
+                    location = pyautogui.locateCenterOnScreen(IMAGE_PATHS['evp_terminado'], confidence=0.97)
+                    if location:
+                        x, y = location
+                        pyautogui.click(x, y)
+                        time.sleep(0.5)
+                        pyautogui.press('e')
+
+                battle_start_image_HP_Try = 3
+                while not is_image_on_screen(IMAGE_PATHS['battle_start_hp']) and self.is_running and not self.is_paused:
+                    if is_image_on_screen(IMAGE_PATHS['captcha_exists']):
+                        dividir_e_desenhar_contornos()
+                    if battle_start_image_HP_Try == 0:
+                        self.status_update.emit("Imagem de inicio de batalha não encontrada.")
+                        if not is_image_on_screen(IMAGE_PATHS['janela_digimon']):
+                            pyautogui.press('v')                        
+                        break
+                    battle_start_image_HP_Try -= 1
+                    time.sleep(1)
+
+                if not self.is_running or self.is_paused:
+                    continue
+
+                time.sleep(1)
+                self.status_update.emit("Buscando imagem de inicio de batalha")
+                
+                if all(is_image_on_screen(IMAGE_PATHS[img]) for img in ['battle_start_hp', 'battle_start_sp', 'battle_start_evp']):
+                    self.status_update.emit("Imagem de início de batalha detectada.")                
+                    pyautogui.press('i')
+                    
+                    if keyboard.is_pressed('r'):
+                        self.status_update.emit(f"Bot encerrado. Tempo de execução: {elapsed_time_str}")
+                        break
+                    
+                    if is_image_on_screen(IMAGE_PATHS['captcha_exists']):
+                        dividir_e_desenhar_contornos()
+                        
+                    initiate_battle(IMAGE_PATHS['battle_detection'], self.main_window.battle_keys)
+                    
+                    if is_image_on_screen(IMAGE_PATHS['captcha_exists']):
+                        dividir_e_desenhar_contornos()
+                        
+                    battle_actions(IMAGE_PATHS['battle_detection'], IMAGE_PATHS['battle_finish'], self.main_window.battle_keys)
+                    
+                    if is_image_on_screen(IMAGE_PATHS['captcha_exists']):
+                        dividir_e_desenhar_contornos()
+                else:
+                    if not is_image_on_screen(IMAGE_PATHS['battle_start_evp']):
+                        pyautogui.press('v')
+                        for _ in range(35):
+                            if not self.is_running or self.is_paused:
+                                break
+                            if is_image_on_screen(IMAGE_PATHS['captcha_exists']):
+                                dividir_e_desenhar_contornos()
+                            pyautogui.press('5')
+                            time.sleep(0.5)                       
+                        pyautogui.press('v')
+                    refill_digimons(self.main_window.digievolucao_combobox.currentText())
+                    
             except Exception as e:
-                log(f"Erro na automação: {str(e)}")
-                self.status_update.emit(f"Erro: {str(e)}")
+                self.status_update.emit(f"Erro na automação: {str(e)}")
             
-            time.sleep(0.1)
-
-    def pause(self):
-        self.is_paused = True
-
-    def resume(self):
-        self.is_paused = False
+            time.sleep(0.1)  # Previne uso excessivo de CPU
 
     def stop(self):
         self.is_running = False
+        
+    def pause(self):
+        self.is_paused = True
+        
+    def resume(self):
+        self.is_paused = False
 
 class KeyButton(QPushButton):
     def __init__(self, key, parent=None):
@@ -384,9 +466,6 @@ class MainWindow(QMainWindow):
         scroll_content = QWidget()
         scroll_area.setWidget(scroll_content)
         
-        # Defina o estilo do scroll_content para ter fundo branco
-        scroll_content.setStyleSheet("background-color: white;")
-        
         self.layout_configurar = QVBoxLayout(scroll_content)
         self.layout_configurar.setAlignment(Qt.AlignTop)
         self.layout_configurar.setSpacing(20)
@@ -428,10 +507,10 @@ class MainWindow(QMainWindow):
         capture_layout.addWidget(self.mensagem_info)
         self.setup_capture_cards(capture_layout)
         self.layout_configurar.addWidget(capture_group)
-        
+
     def toggle_automation(self):
         if self.app_state == APP_STATES['STOPPED']:
-            self.start_automation()
+            self.start_automation()            
         else:
             self.stop_automation()
     
@@ -777,25 +856,6 @@ class MainWindow(QMainWindow):
             QMessageBox.information(self, "Sucesso", "Login realizado com sucesso!")
         else:
             QMessageBox.warning(self, "Erro", "Credenciais inválidas!")
-
-    def start_automation(self):
-        if not self.is_authenticated:
-            QMessageBox.warning(self, "Erro", "Por favor, autentique-se primeiro!")
-            return
-
-        hwnd = win32gui.FindWindow(None, WINDOW_NAME)
-        if hwnd:
-            style = win32gui.GetWindowLong(hwnd, win32con.GWL_STYLE)
-            win32gui.SetWindowLong(hwnd, win32con.GWL_STYLE, style & ~win32con.WS_BORDER)
-
-            resolucao_selecionada = self.resolucao_combobox.currentText()
-            largura, altura = map(int, resolucao_selecionada.split("x"))
-
-            win32gui.SetWindowPos(hwnd, 0, 0, 0, largura, altura, win32con.SWP_NOZORDER | win32con.SWP_FRAMECHANGED)
-
-            self.executar_script()
-        else:
-            QMessageBox.warning(self, "Erro", "Janela 'Digimon SuperRumble' não encontrada.")
 
     def executar_script(self):
         if not self.is_authenticated:
