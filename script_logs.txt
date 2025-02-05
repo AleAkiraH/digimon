@@ -1,0 +1,1 @@
+[2025-02-04 23:56:34] Arquivo de configuração 'config.json' não encontrado.

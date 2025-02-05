@@ -133,47 +133,24 @@ def log(message, log_file="script_logs.txt"):
     except Exception as e:
         print(f"Erro ao registrar a mensagem: {e}")
 
-def load_config(config_file="config.json"):
-    """Carrega as configurações do arquivo JSON."""
-    try:
-        with open(config_file, "r", encoding="utf-8") as file:
-            config = json.load(file)
-        log("Configurações carregadas com sucesso.")
-        return config
-    except FileNotFoundError:
-        log(f"Arquivo de configuração '{config_file}' não encontrado.")
-        return None
-    except json.JSONDecodeError as e:
-        log(f"Erro ao decodificar JSON: {e}")
-        return None
-    
-# Variável global para armazenar a última mensagem de log
 last_log_message = None
 window_name = 'Digimon SuperRumble  '  # Nome da janela
 
-config = load_config()
-if not config:
-    exit("Erro ao carregar as configurações.")
+image_path_captcha_exists = "ScreenSaved\captcha_exists.PNG"
+battle_start_image_HP = "ScreenSaved\battle_start_hp.png"
+battle_start_image_SP = "ScreenSaved\battle_start_sp.png"
+battle_start_image_EVP = "ScreenSaved\battle_start_evp.png"
+battle_detection_image = "ScreenSaved\battle_detection.png"
+battle_finish_image = "ScreenSaved\battle_finish.png"
+janela_digimon = "ScreenSaved\janela_digimon.png"
+EVP_Terminado = "ScreenSaved\EVP_Terminado.png"
 
-image_path_captcha_exists = config["image_path_captcha_exists"]
-path_autoBattle = config["path_autoBattle"]
-battle_start_image_HP = config["battle_start_image_HP"]
-battle_start_image_SP = config["battle_start_image_SP"]
-battle_start_image_EVP = config["battle_start_image_EVP"]
-battle_detection_image = config["battle_detection_image"]
-battle_finish_image = config["battle_finish_image"]
-janela_digimon = config["janela_digimon"]
-EVP_Terminado = config["EVP_Terminado"]
-skill_set = config["SkillSet"]
+x_inicial = "540"
+y_inicial = "239"
+x_final = "825"
+y_final = "525"
 
-bot_token = config["BotToken"]
-chat_id = config["chat_id"]
-
-# Coordenadas da área de interesse
-x_inicial = config["x_inicial"]
-y_inicial = config["y_inicial"]
-x_final = config["x_final"]
-y_final = config["y_final"]
+bot_token,chat_id = "", ""
 
 def calcular_area_homogenea(quadrado):
     """
@@ -202,8 +179,6 @@ def mover_mouse_humano(x_inicial, y_inicial, x_final, y_final):
         y = int(y_inicial + y_step * i + random.randint(-3, 3))  # Desvio aleatório no eixo Y
         pyautogui.moveTo(x, y, duration=random.uniform(0.05, 0.1))  # Variação na duração do movimento
         time.sleep(random.uniform(0.01, 0.03))  # Pequeno delay entre os movimentos
-
-
 
 def dividir_e_desenhar_contornos():
     send_screenshot_telegram(bot_token,chat_id, "Captcha detectado")
@@ -482,14 +457,14 @@ def initiate_battle(battle_detection_image):
             pyautogui.press('g')
             if not is_image_on_screen(battle_finish_image):
                 # log("Iniciando batalha: pressionando 'E1'.")
-                pyautogui.press(skill_set["skill1"])  # w
-                pyautogui.press(skill_set["target1"])  # 1
+                pyautogui.press("e")  # w
+                pyautogui.press("1")  # 1
                 # time.sleep(0.1)
-                pyautogui.press(skill_set["skill2"]);  # a
-                pyautogui.press(skill_set["target2"]);  # 1
+                pyautogui.press("d");  # a
+                pyautogui.press("1");  # 1
                 # time.sleep(0.15)
-                pyautogui.press(skill_set["skill3"]);  # z
-                pyautogui.press(skill_set["target3"]);  # 1
+                pyautogui.press("c");  # z
+                pyautogui.press(1);  # 1
                 # time.sleep(0.12)
             else:
                 pyautogui.press('f')
@@ -504,12 +479,11 @@ def initiate_battle(battle_detection_image):
 def battle_actions(battle_detection_image, battle_finish_image):
     log("Executando ações de batalha.")
     while is_image_on_screen(battle_detection_image):
-        pyautogui.press(skill_set["skill1"])  # e
-        pyautogui.press(skill_set["target1"])  # 1
-        pyautogui.press(skill_set["skill2"]);  # w
-        pyautogui.press(skill_set["target2"]);  # 1
-        pyautogui.press(skill_set["skill3"]);  # c
-        pyautogui.press(skill_set["target3"]);  # 1
+        pyautogui.press("e")  # w
+        pyautogui.press("1")  # 1
+        pyautogui.press("d");  # a
+        pyautogui.press("1");  # 1
+        pyautogui.press("c");  # z
 
     log("Batalha finalizada.")
     while not is_image_on_screen(battle_finish_image):
@@ -668,18 +642,10 @@ def executar_script():
 senha = input("Digite aqui sua senha temporária: ")
 
 if verificar_senha_temporaria(senha):
-    # Obtém o identificador da janela (HWND)
     hwnd = win32gui.FindWindow(None, 'Digimon SuperRumble  ')
-
-    # Remove as bordas da janela
     style = win32gui.GetWindowLong(hwnd, win32con.GWL_STYLE)
     win32gui.SetWindowLong(hwnd, win32con.GWL_STYLE, style & ~win32con.WS_BORDER)
-
-    # Atualiza a janela
     win32gui.SetWindowPos(hwnd, 0, 0, 0, 1366, 768, win32con.SWP_NOZORDER | win32con.SWP_FRAMECHANGED)
-    # win32gui.SetWindowPos(hwnd, 0, 0, 0, 1, 1, win32con.SWP_NOZORDER | win32con.SWP_FRAMECHANGED)
-    # Chama a função antes de continuar com o código principal
-    create_directories()
     executar_script()
 else:
     exit("Acesso negado.")
