@@ -1,0 +1,177 @@
+import time
+import pyautogui
+import numpy as np
+import cv2
+import win32gui
+from variables import COORDINATES, IMAGE_PATHS, DIGIVOLUCAO
+
+# Initialize logging
+last_log_message = None
+
+def log(message, log_file="script_logs.txt"):
+    """Log messages to file and console"""
+    global last_log_message
+    if message != last_log_message:
+        timestamp = time.strftime("%Y-%m-%d %H:%M:%S")
+        formatted_message = f"[{timestamp}] {message}"
+        print(formatted_message)
+        
+        with open(log_file, "a", encoding="utf-8") as file:
+            file.write(formatted_message + "\n")
+        
+        last_log_message = message
+
+def activate_window(window_name):
+    """Activate the game window"""
+    hwnd = win32gui.FindWindow(None, window_name)
+    if hwnd:
+        win32gui.SetForegroundWindow(hwnd)
+        time.sleep(3)
+        log("Janela ativada com sucesso.")
+        return hwnd
+    else:
+        log("A janela não foi encontrada.")
+        return None
+
+def is_image_on_screen(image_path, confidence=0.85):
+    """Check if an image is present on screen"""
+    location = pyautogui.locateCenterOnScreen(image_path, confidence=confidence)
+    return location is not None
+
+def mover_mouse_lento(x_inicial, y_inicial, x_final, y_final):
+    """Move mouse lentamente de um ponto a outro"""
+    # Define o número de etapas para o movimento
+    num_etapas = 100  # Você pode ajustar esse número conforme necessário
+    x_step = (x_final - x_inicial) / num_etapas
+    y_step = (y_final - y_inicial) / num_etapas
+    
+    for i in range(num_etapas + 1):  # Inclui o ponto final
+        xi = int(x_inicial + x_step * i)
+        yi = int(y_inicial + y_step * i)
+        pyautogui.moveTo(xi, yi, duration=0.01)  # Duração fixa para cada movimento
+        time.sleep(0.01)
+    pyautogui.mouseUp(x=xi, y=yi)
+
+def calcular_area_homogenea(quadrado):
+    """Calculate homogeneous area in a square"""
+    pixels = quadrado.reshape(-1, quadrado.shape[-1])
+    unique_pixels, counts = np.unique(pixels, axis=0, return_counts=True)
+    return max(counts)
+
+def dividir_e_desenhar_contornos():    
+    """Process captcha by dividing and drawing contours"""
+    left = min(int(COORDINATES['x_inicial']), int(COORDINATES['x_final'])) 
+    top = min(int(COORDINATES['y_inicial']), int(COORDINATES['y_final']))
+    width = abs(int(COORDINATES['x_final']) - int(COORDINATES['x_inicial']))
+    height = abs(int(COORDINATES['y_final']) - int(COORDINATES['y_inicial']))
+    
+    screenshot = pyautogui.screenshot(region=(left, top, width, height))
+    image = np.array(screenshot)
+    image = cv2.cvtColor(image, cv2.COLOR_RGB2BGR)
+    cv2.imwrite("CaptchaSolution\\screenshot.png", image)
+    
+    altura, largura, _ = image.shape
+    tamanho_quadrado_largura = largura // 8
+    tamanho_quadrado_altura = altura // 8
+
+    max_homogeneidade = 0
+    quadrado_mais_homogeneo = None
+
+    for i in range(8):
+        for j in range(8):
+            x_inicio = i * tamanho_quadrado_largura
+            y_inicio = j * tamanho_quadrado_altura
+            x_fim = (i + 1) * tamanho_quadrado_largura
+            y_fim = (j + 1) * tamanho_quadrado_altura
+
+            quadrado = image[y_inicio:y_fim, x_inicio:x_fim]
+            homogeneidade = calcular_area_homogenea(quadrado)
+            
+            if homogeneidade > max_homogeneidade:
+                max_homogeneidade = homogeneidade
+                quadrado_mais_homogeneo = (x_inicio, y_inicio, x_fim, y_fim)
+
+    if quadrado_mais_homogeneo:
+        x_inicio, y_inicio, x_fim, y_fim = quadrado_mais_homogeneo
+        quadrado_azul = image[y_inicio:y_fim, x_inicio:x_fim]
+        temp_image_path = "CaptchaSolution\\quadrado_azul.png"
+        cv2.imwrite(temp_image_path, quadrado_azul)
+        
+        location = pyautogui.locateCenterOnScreen(temp_image_path, confidence=0.85)
+        if location:
+            x_final, y_final = location
+            x_inicial, y_inicial = 296, 438 # centro do objeto a ser arrastado do captcha
+
+            pyautogui.mouseDown(x=x_inicial, y=y_inicial)
+            mover_mouse_lento(x_inicial, y_inicial, x_final, y_final)
+            
+            log(f"Mouse movido para o quadrado azul.")
+            time.sleep(5)
+        else:
+            log("Falha ao localizar o quadrado azul na tela.")
+
+def battle_actions(battle_detection_image, battle_finish_image):
+    """Execute battle actions"""
+    log("Executando ações de batalha.")
+    while is_image_on_screen(battle_detection_image):
+        pyautogui.press("e")
+        pyautogui.press("1")
+        pyautogui.press("d")
+        pyautogui.press("1")
+        pyautogui.press("c")
+        pyautogui.press("1")
+
+    log("Batalha finalizada.")
+    while not is_image_on_screen(battle_finish_image):
+        log("Aguardando para iniciar uma nova batalha.")
+
+def initiate_battle(battle_detection_image):
+    """Initiate battle sequence"""
+    while is_image_on_screen(IMAGE_PATHS['battle_finish']):
+        pyautogui.press('v')
+        log("Procurando batalha: pressionando 'F'.")
+        for _ in range(20):
+            if is_image_on_screen(battle_detection_image):
+                break
+            for _ in range(5):
+                pyautogui.press('g')
+            if not is_image_on_screen(IMAGE_PATHS['battle_finish']):
+                pyautogui.press("e")
+                pyautogui.press("1")
+                pyautogui.press("d")
+                pyautogui.press("1")
+                pyautogui.press("c")
+                pyautogui.press("1")
+            else:
+                pyautogui.press('f')
+
+        if is_image_on_screen(IMAGE_PATHS['captcha_exists']):
+            dividir_e_desenhar_contornos()
+        
+        time.sleep(0.5)
+    log("Batalha iniciada.")
+
+def refill_digimons(digivolucao_type='mega'):
+    """Refill digimons with specified evolution"""
+    if is_image_on_screen(IMAGE_PATHS['captcha_exists']):
+        dividir_e_desenhar_contornos()
+
+    remove_coords = DIGIVOLUCAO['rookie']
+    digivolucao_coords = DIGIVOLUCAO.get(digivolucao_type, DIGIVOLUCAO['mega'])
+    
+    for coords in remove_coords:
+        for coord in coords:
+            if is_image_on_screen(IMAGE_PATHS['captcha_exists']):
+                dividir_e_desenhar_contornos()
+            pyautogui.click(x=coord[0], y=coord[1])
+        log("Digivolução retirada.")
+    
+    for coords in digivolucao_coords:
+        for coord in coords:
+            time.sleep(0.5)
+            pyautogui.click(x=coord[0], y=coord[1])            
+        log("Digivolução aplicada.")
+    
+    pyautogui.press('v')
+    log("Refill concluído.")
+
