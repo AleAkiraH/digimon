@@ -1,2 +1,7 @@
 __pycache__/*
 script_logs.txt
+build/*
+dist/*
+main.exe
+main.exe.manifest
+main.spec
