@@ -8,13 +8,68 @@ from PyQt5.QtWidgets import (QApplication, QMainWindow, QLabel, QComboBox,
                            QWidget, QMessageBox, QFrame,
                            QSizePolicy, QTabWidget, QGroupBox, QLineEdit, QScrollArea)
 from PyQt5.QtGui import QPixmap, QImage, QPainter, QColor, QLinearGradient, QFont
-from PyQt5.QtCore import Qt, QSize
+from PyQt5.QtCore import Qt, QSize, QThread, pyqtSignal
 from PIL import ImageGrab
 import io, keyboard
 
 # Importe as funções e variáveis necessárias dos outros arquivos
-from variables import WINDOW_NAME, RESOLUCAO_PADRAO, SCREENSHOTS_DIR, IMAGE_PATHS
+from variables import WINDOW_NAME, RESOLUCAO_PADRAO, SCREENSHOTS_DIR, IMAGE_PATHS, APP_STATES
 from functions import log, is_image_on_screen, dividir_e_desenhar_contornos, initiate_battle, battle_actions, refill_digimons
+
+class AutomationThread(QThread):
+    status_update = pyqtSignal(str)
+
+    def __init__(self, main_window):
+        super().__init__()
+        self.main_window = main_window
+        self.is_running = True
+        self.is_paused = False
+
+    def run(self):
+        start_time = time.time()
+        while self.is_running:
+            if self.is_paused:
+                time.sleep(0.1)
+                continue
+
+            try:
+                self.main_window.run_automation_cycle(start_time)
+            except Exception as e:
+                log(f"Erro na automação: {str(e)}")
+                self.status_update.emit(f"Erro: {str(e)}")
+            
+            time.sleep(0.1)
+
+    def pause(self):
+        self.is_paused = True
+
+    def resume(self):
+        self.is_paused = False
+
+    def stop(self):
+        self.is_running = False
+
+class KeyButton(QPushButton):
+    def __init__(self, key, parent=None):
+        super().__init__(key, parent)
+        self.setFixedSize(50, 50)
+        self.setStyleSheet("""
+            QPushButton {
+                background-color: #FFB6C1;
+                border: 2px solid #4682B4;
+                border-radius: 5px;
+                font-size: 16px;
+                font-weight: bold;
+            }
+            QPushButton:checked {
+                background-color: #4682B4;
+                color: white;
+            }
+            QPushButton:hover {
+                background-color: #e0e0e0;
+            }
+        """)
+        self.setCheckable(True)
 
 class MainWindow(QMainWindow):
     def __init__(self):
@@ -83,6 +138,15 @@ class MainWindow(QMainWindow):
         """)
         
         self.is_authenticated = False
+        self.automation_thread = None
+        self.app_state = APP_STATES['STOPPED']
+        
+        self.battle_keys = {
+            'group1': '',
+            'group2': '',
+            'group3': ''
+        }
+        
         self.setup_ui()
         self.carregar_imagens()
 
@@ -106,130 +170,222 @@ class MainWindow(QMainWindow):
         self.tab_auth = QWidget()
         self.tabs.addTab(self.tab_auth, "Login")
         
-        scroll_area = QScrollArea()
-        scroll_area.setWidgetResizable(True)
-        scroll_content = QWidget()
-        scroll_area.setWidget(scroll_content)
+        # Main container with fixed width
+        container = QWidget()
+        container.setFixedWidth(400)
+        container_layout = QVBoxLayout(container)
+        container_layout.setAlignment(Qt.AlignCenter)
+        container_layout.setSpacing(20)
         
-        login_layout = QVBoxLayout(scroll_content)
-        login_layout.setAlignment(Qt.AlignCenter)
-        login_layout.setSpacing(20)
+        # Center the container
+        main_layout = QHBoxLayout(self.tab_auth)
+        main_layout.addWidget(container)
         
-        main_layout = QVBoxLayout(self.tab_auth)
-        main_layout.addWidget(scroll_area)
-        
-        auth_group = QGroupBox("Autenticação")
-        auth_layout = QVBoxLayout()
-        auth_group.setLayout(auth_layout)
-        
+        # Logo and title
         title_label = QLabel("Digimon Automation")
-        title_label.setStyleSheet("font-size: 24px; font-weight: bold; color: #4682B4; margin-bottom: 20px;")
-        auth_layout.addWidget(title_label, alignment=Qt.AlignCenter)
+        title_label.setStyleSheet("""
+            font-size: 28px;
+            font-weight: bold;
+            color: #4682B4;
+            margin: 20px 0;
+        """)
+        title_label.setAlignment(Qt.AlignCenter)
+        container_layout.addWidget(title_label)
+        
+        # Login form
+        login_form = QGroupBox()
+        login_form.setStyleSheet("""
+            QGroupBox {
+                background-color: white;
+                border-radius: 10px;
+                padding: 20px;
+            }
+        """)
+        form_layout = QVBoxLayout(login_form)
+        form_layout.setSpacing(15)
+        
+        # Username
+        username_label = QLabel("Username")
+        username_label.setStyleSheet("color: #666; font-size: 14px;")
+        form_layout.addWidget(username_label)
         
         self.username_input = QLineEdit()
-        self.username_input.setPlaceholderText("Username")
+        self.username_input.setPlaceholderText("Enter your username")
         self.username_input.setStyleSheet("""
-            background-color: white;
-            border: 1px solid #4682B4;
-            border-radius: 5px;
-            padding: 10px;
-            margin-bottom: 10px;
-            font-size: 14px;
+            QLineEdit {
+                padding: 12px;
+                border: 2px solid #e0e0e0;
+                border-radius: 5px;
+                font-size: 14px;
+            }
+            QLineEdit:focus {
+                border-color: #4682B4;
+            }
         """)
-        auth_layout.addWidget(self.username_input)
+        form_layout.addWidget(self.username_input)
+        
+        # Password
+        password_label = QLabel("Password")
+        password_label.setStyleSheet("color: #666; font-size: 14px;")
+        form_layout.addWidget(password_label)
         
         self.password_input = QLineEdit()
-        self.password_input.setPlaceholderText("Password")
+        self.password_input.setPlaceholderText("Enter your password")
         self.password_input.setEchoMode(QLineEdit.Password)
         self.password_input.setStyleSheet("""
-            background-color: white;
-            border: 1px solid #4682B4;
-            border-radius: 5px;
-            padding: 10px;
-            margin-bottom: 20px;
-            font-size: 14px;
+            QLineEdit {
+                padding: 12px;
+                border: 2px solid #e0e0e0;
+                border-radius: 5px;
+                font-size: 14px;
+            }
+            QLineEdit:focus {
+                border-color: #4682B4;
+            }
         """)
-        auth_layout.addWidget(self.password_input)
+        form_layout.addWidget(self.password_input)
         
+        # Login button
         login_button = QPushButton("Login")
-        login_button.clicked.connect(self.authenticate)
-        login_button.setStyleSheet("""
-            background-color: #4CAF50;
-            color: white;
-            border: none;
-            border-radius: 5px;
-            padding: 10px;
-            font-size: 16px;
-            font-weight: bold;
-        """)
         login_button.setCursor(Qt.PointingHandCursor)
-        auth_layout.addWidget(login_button)
+        login_button.setStyleSheet("""
+            QPushButton {
+                background-color: #4CAF50;
+                color: white;
+                border: none;
+                border-radius: 5px;
+                padding: 12px;
+                font-size: 16px;
+                font-weight: bold;
+                margin-top: 10px;
+            }
+            QPushButton:hover {
+                background-color: #45a049;
+            }
+        """)
+        login_button.clicked.connect(self.authenticate)
+        form_layout.addWidget(login_button)
         
-        login_layout.addWidget(auth_group)
+        container_layout.addWidget(login_form)
+        container_layout.addStretch()
 
     def setup_play_tab(self):
         self.tab_jogar = QWidget()
         self.tabs.addTab(self.tab_jogar, "Jogar")
         
-        scroll_area = QScrollArea()
-        scroll_area.setWidgetResizable(True)
-        scroll_content = QWidget()
-        scroll_area.setWidget(scroll_content)
+        # Main container with fixed width
+        container = QWidget()
+        container.setFixedWidth(400)
+        container_layout = QVBoxLayout(container)
+        container_layout.setAlignment(Qt.AlignCenter)
+        container_layout.setSpacing(20)
         
-        self.layout_jogar = QVBoxLayout(scroll_content)
-        self.layout_jogar.setAlignment(Qt.AlignCenter)
-        self.layout_jogar.setSpacing(20)
+        # Center the container
+        main_layout = QHBoxLayout(self.tab_jogar)
+        main_layout.addWidget(container)
         
-        main_layout = QVBoxLayout(self.tab_jogar)
-        main_layout.addWidget(scroll_area)
-        
-        play_group = QGroupBox("Iniciar Jogo")
-        play_layout = QVBoxLayout()
-        play_group.setLayout(play_layout)
-        
-        title_label = QLabel("Bem-vindo ao projeto TERAS")
-        title_label.setStyleSheet("font-size: 24px; font-weight: bold; color: #4682B4; margin-bottom: 20px;")
+        # Title
+        title_label = QLabel("Digimon Automation")
+        title_label.setStyleSheet("""
+            font-size: 28px;
+            font-weight: bold;
+            color: #4682B4;
+            margin: 20px 0;
+        """)
         title_label.setAlignment(Qt.AlignCenter)
-        play_layout.addWidget(title_label)
-
-        try:
-            digimon_image = QPixmap("digimon.png")
-            digimon_label = QLabel()
-            digimon_label.setPixmap(digimon_image.scaledToWidth(300))
-            digimon_label.setAlignment(Qt.AlignCenter)
-            play_layout.addWidget(digimon_label)
-        except:
-            play_layout.addWidget(QLabel("Imagem Digimon não encontrada"))
-
+        container_layout.addWidget(title_label)
+        
+        # Main content group
+        content_group = QGroupBox()
+        content_group.setStyleSheet("""
+            QGroupBox {
+                background-color: white;
+                border-radius: 10px;
+                padding: 20px;
+            }
+        """)
+        content_layout = QVBoxLayout(content_group)
+        content_layout.setSpacing(15)
+        
+        # Description
         description = QLabel("Prepare-se para uma aventura emocionante no mundo dos Digimons!")
-        description.setStyleSheet("font-size: 16px; color: #666; margin-bottom: 20px;")
+        description.setStyleSheet("""
+            font-size: 16px;
+            color: #666;
+            margin-bottom: 20px;
+        """)
         description.setAlignment(Qt.AlignCenter)
         description.setWordWrap(True)
-        play_layout.addWidget(description)
-
-        play_button = QPushButton("Iniciar Automação")
-        play_button.setStyleSheet("""
-            font-size: 18px;
-            background-color: #4CAF50;
-            color: white;
-            border-radius: 5px;
-            padding: 15px 30px;
-            margin-top: 20px;
-        """)
-        play_button.setCursor(Qt.PointingHandCursor)
-        play_button.clicked.connect(self.start_automation)
-        play_layout.addWidget(play_button, alignment=Qt.AlignCenter)
+        content_layout.addWidget(description)
         
-        self.layout_jogar.addWidget(play_group)
+        # Status label
+        self.status_label = QLabel("Status: Parado")
+        self.status_label.setStyleSheet("""
+            font-size: 14px;
+            color: #666;
+            margin: 10px 0;
+        """)
+        self.status_label.setAlignment(Qt.AlignCenter)
+        content_layout.addWidget(self.status_label)
+        
+        # Buttons container
+        buttons_container = QWidget()
+        buttons_layout = QHBoxLayout(buttons_container)
+        buttons_layout.setSpacing(10)
+        
+        # Start button
+        self.start_button = QPushButton("Iniciar Automação")
+        self.start_button.setStyleSheet("""
+            QPushButton {
+                background-color: #4CAF50;
+                color: white;
+                border: none;
+                border-radius: 5px;
+                padding: 12px;
+                font-size: 16px;
+                font-weight: bold;
+            }
+            QPushButton:hover {
+                background-color: #45a049;
+            }
+        """)
+        self.start_button.clicked.connect(self.toggle_automation)
+        buttons_layout.addWidget(self.start_button)
+        
+        # Pause button
+        self.pause_button = QPushButton("Pausar")
+        self.pause_button.setStyleSheet("""
+            QPushButton {
+                background-color: #FFA500;
+                color: white;
+                border: none;
+                border-radius: 5px;
+                padding: 12px;
+                font-size: 16px;
+                font-weight: bold;
+            }
+            QPushButton:hover {
+                background-color: #FF8C00;
+            }
+        """)
+        self.pause_button.clicked.connect(self.toggle_pause)
+        self.pause_button.setEnabled(False)
+        buttons_layout.addWidget(self.pause_button)
+        
+        content_layout.addWidget(buttons_container)
+        container_layout.addWidget(content_group)
+        container_layout.addStretch()
 
     def setup_config_tab(self):
         self.tab_configurar = QWidget()
         self.tabs.addTab(self.tab_configurar, "Configurar")
-        
         scroll_area = QScrollArea()
         scroll_area.setWidgetResizable(True)
         scroll_content = QWidget()
         scroll_area.setWidget(scroll_content)
+        
+        # Defina o estilo do scroll_content para ter fundo branco
+        scroll_content.setStyleSheet("background-color: white;")
         
         self.layout_configurar = QVBoxLayout(scroll_content)
         self.layout_configurar.setAlignment(Qt.AlignTop)
@@ -237,33 +393,135 @@ class MainWindow(QMainWindow):
         
         main_layout = QVBoxLayout(self.tab_configurar)
         main_layout.addWidget(scroll_area)
-
         title_label = QLabel("Configurações")
-        title_label.setStyleSheet("font-size: 24px; font-weight: bold; color: #4682B4; margin-bottom: 20px;")
+        title_label.setStyleSheet("""
+            font-size: 28px;
+            font-weight: bold;
+            color: #4682B4;
+            margin: 20px 0;
+        """)
         title_label.setAlignment(Qt.AlignCenter)
         self.layout_configurar.addWidget(title_label)
-
+        
         general_group = QGroupBox("Configurações Gerais")
+        general_group.setStyleSheet("""
+            QGroupBox {
+                background-color: white;
+                border-radius: 10px;
+                padding: 20px;
+                color: #4682B4;
+            }
+        """)
         general_layout = QVBoxLayout()
         general_group.setLayout(general_layout)
-
+        
         self.setup_resolution_config(general_layout)
         self.setup_digievolution_config(general_layout)
-
+        self.setup_battle_keys_config(general_layout)
         self.layout_configurar.addWidget(general_group)
 
         capture_group = QGroupBox("Captura de Imagens")
         capture_layout = QVBoxLayout()
         capture_group.setLayout(capture_layout)
-
         self.mensagem_info = QLabel("Certifique-se de que a tela de informações do Digimon está aberta!")
-        self.mensagem_info.setStyleSheet("font-style: italic; color: #666;")
+        self.mensagem_info.setStyleSheet("font-style: italic; font-size: 16px; color: #4682B4;")
         capture_layout.addWidget(self.mensagem_info)
-
         self.setup_capture_cards(capture_layout)
-
         self.layout_configurar.addWidget(capture_group)
+        
+    def toggle_automation(self):
+        if self.app_state == APP_STATES['STOPPED']:
+            self.start_automation()
+        else:
+            self.stop_automation()
+    
+    def toggle_pause(self):
+        if self.app_state == APP_STATES['RUNNING']:
+            self.pause_automation()
+        elif self.app_state == APP_STATES['PAUSED']:
+            self.resume_automation()
 
+    def start_automation(self):
+        if not self.is_authenticated:
+            QMessageBox.warning(self, "Erro", "Por favor, autentique-se primeiro!")
+            return
+
+        self.app_state = APP_STATES['RUNNING']
+        self.start_button.setText("Parar")
+        self.start_button.setStyleSheet("""
+            font-size: 16px;
+            background-color: #dc3545;
+            color: white;
+            border-radius: 5px;
+            padding: 12px 24px;
+        """)
+        self.pause_button.setEnabled(True)
+        self.status_label.setText("Status: Em execução")
+
+        self.automation_thread = AutomationThread(self)
+        self.automation_thread.status_update.connect(self.update_status)
+        self.automation_thread.start()
+
+    def pause_automation(self):
+        if self.automation_thread:
+            self.app_state = APP_STATES['PAUSED']
+            self.automation_thread.pause()
+            self.pause_button.setText("Continuar")
+            self.status_label.setText("Status: Pausado")
+
+    def resume_automation(self):
+        if self.automation_thread:
+            self.app_state = APP_STATES['RUNNING']
+            self.automation_thread.resume()
+            self.pause_button.setText("Pausar")
+            self.status_label.setText("Status: Em execução")
+
+    def stop_automation(self):
+        if self.automation_thread:
+            self.automation_thread.stop()
+            self.automation_thread.wait()
+            self.automation_thread = None
+
+        self.app_state = APP_STATES['STOPPED']
+        self.start_button.setText("Iniciar Automação")
+        self.start_button.setStyleSheet("""
+            font-size: 16px;
+            background-color: #4CAF50;
+            color: white;
+            border-radius: 5px;
+            padding: 12px 24px;
+        """)
+        self.pause_button.setEnabled(False)
+        self.pause_button.setText("Pausar")
+        self.status_label.setText("Status: Parado")
+
+    def update_status(self, message):
+        self.status_label.setText(f"Status: {message}")
+
+    def run_automation_cycle(self, start_time):
+        # Move the automation logic from executar_script here
+        # This is the same code as before, just moved to a new method
+        if is_image_on_screen(IMAGE_PATHS['captcha_exists']):
+            dividir_e_desenhar_contornos()
+        
+        elapsed_time = time.time() - start_time
+        elapsed_hours = int(elapsed_time // 3600)
+        elapsed_minutes = int((elapsed_time % 3600) // 60)
+        elapsed_seconds = int(elapsed_time % 60)
+        elapsed_time_str = f"{elapsed_hours:02}:{elapsed_minutes:02}:{elapsed_seconds:02}"
+
+        log("Automação principal em execução...")
+        
+        for _ in range(3):
+            if is_image_on_screen(IMAGE_PATHS['captcha_exists']):
+                dividir_e_desenhar_contornos()
+        
+        time.sleep(1)
+        for _ in range(4):
+            pyautogui.press('g')
+        pyautogui.press('v')
+        time.sleep(1)
+        
     def setup_resolution_config(self, layout):
         config_layout = QHBoxLayout()
         layout.addLayout(config_layout)
@@ -293,6 +551,63 @@ class MainWindow(QMainWindow):
         self.digievolucao_combobox.currentIndexChanged.connect(self.atualizar_digievolucao)
         digievolucao_layout.addWidget(self.digievolucao_combobox)
         digievolucao_layout.addStretch()
+
+    def setup_battle_keys_config(self, layout):
+        battle_keys_group = QGroupBox("Configuração de Teclas de Batalha")
+        battle_keys_layout = QVBoxLayout()
+        battle_keys_group.setLayout(battle_keys_layout)
+
+        # Define the key groups
+        key_groups = [
+            ('group1', ['Q', 'W', 'E']),
+            ('group2', ['A', 'S', 'D']),
+            ('group3', ['Z', 'X', 'C'])
+        ]
+
+        # Create buttons for each group
+        for group_name, keys in key_groups:
+            group_layout = QHBoxLayout()
+            
+            # Add group label
+            label = QLabel(f"Grupo {group_name[-1]}:")
+            label.setFixedWidth(100)
+            group_layout.addWidget(label)
+
+            # Create button group to handle exclusive selection within group
+            button_group = QHBoxLayout()
+            
+            # Create buttons for each key in the group
+            for key in keys:
+                button = KeyButton(key)
+                button.setProperty('group', group_name)  # Store group name as property
+                button.clicked.connect(lambda checked, k=key, g=group_name: self.update_battle_key(k, g))
+                button_group.addWidget(button)
+
+            group_layout.addLayout(button_group)
+            battle_keys_layout.addLayout(group_layout)
+
+        layout.addWidget(battle_keys_group)
+
+    def update_battle_key(self, key, group):
+        button = self.sender()
+        is_checked = button.isChecked()
+
+        # If the button was unchecked, clear the key for this group
+        if not is_checked:
+            self.battle_keys[group] = ''
+            return
+
+        # Update the key for this group
+        self.battle_keys[group] = key
+
+        # Uncheck other buttons in the same group
+        parent = button.parent()
+        for other_button in parent.findChildren(KeyButton):
+            if other_button != button and other_button.property('group') == group:
+                other_button.setChecked(False)
+
+        # Print current state of battle keys
+        print("Current battle keys:", self.battle_keys)
 
     def setup_capture_cards(self, layout):
         self.image_filenames = [
@@ -339,15 +654,12 @@ class MainWindow(QMainWindow):
             border-radius: 10px;
             padding: 10px;
         """)
-        
         card_layout = QVBoxLayout(card)
-        
         title = QLabel(f"{index + 1} - {self.get_title(index)}")
         title.setStyleSheet("font-size: 12px; font-weight: bold; color: #4682B4;")
         title.setWordWrap(True)
         title.setAlignment(Qt.AlignCenter)
         card_layout.addWidget(title)
-        
         label = QLabel(self)
         label.setFixedSize(150, 100)
         label.setStyleSheet("background-color: #f0f0f0; border: 1px solid #cccccc;")
@@ -502,25 +814,13 @@ class MainWindow(QMainWindow):
 
             log("Automação principal em execução...")
             
-            if is_image_on_screen(IMAGE_PATHS['captcha_exists']):
-                print(f"Imagem {IMAGE_PATHS['captcha_exists']} encontrada na tela. Processando...")
-                dividir_e_desenhar_contornos()
-            if is_image_on_screen(IMAGE_PATHS['captcha_exists']):
-                print(f"Imagem {IMAGE_PATHS['captcha_exists']} encontrada na tela. Processando...")
-                dividir_e_desenhar_contornos()
-            if is_image_on_screen(IMAGE_PATHS['captcha_exists']):
-                print(f"Imagem {IMAGE_PATHS['captcha_exists']} encontrada na tela. Processando...")
-                dividir_e_desenhar_contornos()
+            for _ in range(3):
+                if is_image_on_screen(IMAGE_PATHS['captcha_exists']):
+                    dividir_e_desenhar_contornos()
             
             time.sleep(1)
-            pyautogui.press('g')
-            pyautogui.press('g')
-            if is_image_on_screen(IMAGE_PATHS['captcha_exists']):
-                print(f"Imagem {IMAGE_PATHS['captcha_exists']} encontrada na tela. Processando...")
-                dividir_e_desenhar_contornos()
-
-            pyautogui.press('g')
-            pyautogui.press('g')
+            for _ in range(4):
+                pyautogui.press('g')
             pyautogui.press('v')
             time.sleep(1)
 
@@ -562,12 +862,12 @@ class MainWindow(QMainWindow):
                 if is_image_on_screen(IMAGE_PATHS['captcha_exists']):
                     dividir_e_desenhar_contornos()
                     
-                initiate_battle(IMAGE_PATHS['battle_detection'])
+                initiate_battle(IMAGE_PATHS['battle_detection'], self.battle_keys)
                 
                 if is_image_on_screen(IMAGE_PATHS['captcha_exists']):
                     dividir_e_desenhar_contornos()
                     
-                battle_actions(IMAGE_PATHS['battle_detection'], IMAGE_PATHS['battle_finish'])
+                battle_actions(IMAGE_PATHS['battle_detection'], IMAGE_PATHS['battle_finish'], self.battle_keys)
                 
                 if is_image_on_screen(IMAGE_PATHS['captcha_exists']):
                     dividir_e_desenhar_contornos()

@@ -49,6 +49,12 @@ DIGIVOLUCAO = {
     ]
 }
 
+# Application states
+APP_STATES = {
+    'RUNNING': 'running',
+    'PAUSED': 'paused',
+    'STOPPED': 'stopped'
+}
+
 # Initialize logging
 last_log_message = None
-

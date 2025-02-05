@@ -2,7 +2,11 @@ import time
 import pyautogui
 import numpy as np
 import cv2
+import keyboard
 import win32gui
+import win32con
+from PIL import ImageGrab
+import io
 from variables import COORDINATES, IMAGE_PATHS, DIGIVOLUCAO
 
 # Initialize logging
@@ -110,22 +114,25 @@ def dividir_e_desenhar_contornos():
         else:
             log("Falha ao localizar o quadrado azul na tela.")
 
-def battle_actions(battle_detection_image, battle_finish_image):
+def battle_actions(battle_detection_image, battle_finish_image, battle_keys):
     """Execute battle actions"""
     log("Executando ações de batalha.")
     while is_image_on_screen(battle_detection_image):
-        pyautogui.press("e")
-        pyautogui.press("1")
-        pyautogui.press("d")
-        pyautogui.press("1")
-        pyautogui.press("c")
-        pyautogui.press("1")
+        if battle_keys['group1']:
+            pyautogui.press(battle_keys['group1'].lower())
+            pyautogui.press("1")
+        if battle_keys['group2']:
+            pyautogui.press(battle_keys['group2'].lower())
+            pyautogui.press("1")
+        if battle_keys['group3']:
+            pyautogui.press(battle_keys['group3'].lower())
+            pyautogui.press("1")
 
     log("Batalha finalizada.")
     while not is_image_on_screen(battle_finish_image):
         log("Aguardando para iniciar uma nova batalha.")
 
-def initiate_battle(battle_detection_image):
+def initiate_battle(battle_detection_image, battle_keys):
     """Initiate battle sequence"""
     while is_image_on_screen(IMAGE_PATHS['battle_finish']):
         pyautogui.press('v')
@@ -136,12 +143,15 @@ def initiate_battle(battle_detection_image):
             for _ in range(5):
                 pyautogui.press('g')
             if not is_image_on_screen(IMAGE_PATHS['battle_finish']):
-                pyautogui.press("e")
-                pyautogui.press("1")
-                pyautogui.press("d")
-                pyautogui.press("1")
-                pyautogui.press("c")
-                pyautogui.press("1")
+                if battle_keys['group1']:
+                    pyautogui.press(battle_keys['group1'].lower())
+                    pyautogui.press("1")
+                if battle_keys['group2']:
+                    pyautogui.press(battle_keys['group2'].lower())
+                    pyautogui.press("1")
+                if battle_keys['group3']:
+                    pyautogui.press(battle_keys['group3'].lower())
+                    pyautogui.press("1")
             else:
                 pyautogui.press('f')
 
@@ -174,4 +184,3 @@ def refill_digimons(digivolucao_type='mega'):
     
     pyautogui.press('v')
     log("Refill concluído.")
-
