@@ -19,12 +19,15 @@ from database import Database
 
 class AutomationThread(QThread):
     status_update = pyqtSignal(str)
+    time_update = pyqtSignal(str)
+    battles_update = pyqtSignal(int)
     
     def __init__(self, main_window):
         super().__init__()
         self.main_window = main_window
         self.is_running = True
         self.is_paused = False
+        self.battles_count = 0
         
     def run(self):   
         start_time = time.time()
@@ -102,6 +105,8 @@ class AutomationThread(QThread):
                         dividir_e_desenhar_contornos()
                         
                     battle_actions(IMAGE_PATHS['battle_detection'], IMAGE_PATHS['battle_finish'], self.main_window.battle_keys)
+                    self.battles_count +=1
+                    self.battles_update.emit(self.battles_count)
                     
                     if is_image_on_screen(IMAGE_PATHS['captcha_exists']):
                         dividir_e_desenhar_contornos()
@@ -121,6 +126,7 @@ class AutomationThread(QThread):
             except Exception as e:
                 self.status_update.emit(f"Erro na automação: {str(e)}")
             
+            self.time_update.emit(elapsed_time_str)
             time.sleep(0.1)  # Previne uso excessivo de CPU
 
     def stop(self):
@@ -412,6 +418,24 @@ class MainWindow(QMainWindow):
         """)
         self.status_label.setAlignment(Qt.AlignCenter)
         content_layout.addWidget(self.status_label)
+
+        self.time_label = QLabel("Tempo decorrido: 00:00:00")
+        self.time_label.setStyleSheet("""
+            font-size: 14px;
+            color: #666;
+            margin: 5px 0;
+        """)
+        self.time_label.setAlignment(Qt.AlignCenter)
+        content_layout.addWidget(self.time_label)
+
+        self.battles_label = QLabel("Batalhas realizadas: 0")
+        self.battles_label.setStyleSheet("""
+            font-size: 14px;
+            color: #666;
+            margin: 5px 0;
+        """)
+        self.battles_label.setAlignment(Qt.AlignCenter)
+        content_layout.addWidget(self.battles_label)
         
         # Buttons container
         buttons_container = QWidget()
@@ -717,6 +741,8 @@ class MainWindow(QMainWindow):
 
         self.automation_thread = AutomationThread(self)
         self.automation_thread.status_update.connect(self.update_status)
+        self.automation_thread.time_update.connect(self.update_time)
+        self.automation_thread.battles_update.connect(self.update_battles)
         self.automation_thread.start()
 
     def pause_automation(self):
@@ -754,6 +780,12 @@ class MainWindow(QMainWindow):
 
     def update_status(self, message):
         self.status_label.setText(f"Status: {message}")
+
+    def update_time(self, time_str):
+        self.time_label.setText(f"Tempo decorrido: {time_str}")
+
+    def update_battles(self, battles):
+        self.battles_label.setText(f"Batalhas realizadas: {battles}")
 
     def escolher_resolucao(self):
         resolucao_selecionada = self.resolucao_combobox.currentText()
@@ -818,6 +850,27 @@ class MainWindow(QMainWindow):
         except Exception as e:
             print(f"Erro ao capturar a tela: {e}")
             return None
+        
+    def update_battle_key(self, key, group):
+        button = self.sender()
+        is_checked = button.isChecked()
+
+        # If the button was unchecked, clear the key for this group
+        if not is_checked:
+            self.battle_keys[group] = ''
+            return
+
+        # Update the key for this group
+        self.battle_keys[group] = key
+
+        # Uncheck other buttons in the same group
+        parent = button.parent()
+        for other_button in parent.findChildren(KeyButton):
+            if other_button != button and other_button.property('group') == group:
+                other_button.setChecked(False)
+
+        # Print current state of battle keys
+        print("Current battle keys:", self.battle_keys)
 
     def carregar_imagens(self):
         for i, card in enumerate(self.cards):
