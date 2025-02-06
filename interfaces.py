@@ -663,7 +663,7 @@ class MainWindow(QMainWindow):
         return titles[index] if index < len(titles) else "Título Desconhecido"
 
     def authenticate(self):
-        username = self.username_input.text()
+        username = self.username_input.text().lower()
         password = self.password_input.text()
         
         try:
