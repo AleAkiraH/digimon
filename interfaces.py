@@ -440,11 +440,10 @@ class MainWindow(QMainWindow):
         # Buttons container
         buttons_container = QWidget()
         buttons_layout = QHBoxLayout(buttons_container)
-        buttons_layout.setSpacing(10)
         
-        # Start button
-        self.start_button = QPushButton("Iniciar Automação")
-        self.start_button.setStyleSheet("""
+        # Start/Stop button
+        self.start_stop_button = QPushButton("Iniciar Automação")
+        self.start_stop_button.setStyleSheet("""
             QPushButton {
                 background-color: #4CAF50;
                 color: white;
@@ -458,29 +457,9 @@ class MainWindow(QMainWindow):
                 background-color: #45a049;
             }
         """)
-        self.start_button.clicked.connect(self.escolher_resolucao)
-        self.start_button.clicked.connect(self.toggle_automation)
-        buttons_layout.addWidget(self.start_button)
-        
-        # Pause button
-        self.pause_button = QPushButton("Pausar")
-        self.pause_button.setStyleSheet("""
-            QPushButton {
-                background-color: #FFA500;
-                color: white;
-                border: none;
-                border-radius: 5px;
-                padding: 12px;
-                font-size: 16px;
-                font-weight: bold;
-            }
-            QPushButton:hover {
-                background-color: #FF8C00;
-            }
-        """)
-        self.pause_button.clicked.connect(self.toggle_pause)
-        self.pause_button.setEnabled(False)
-        buttons_layout.addWidget(self.pause_button)
+        self.start_stop_button.clicked.connect(self.escolher_resolucao)
+        self.start_stop_button.clicked.connect(self.toggle_automation)
+        buttons_layout.addWidget(self.start_stop_button)
         
         content_layout.addWidget(buttons_container)
         container_layout.addWidget(content_group)
@@ -716,27 +695,27 @@ class MainWindow(QMainWindow):
         else:
             self.stop_automation()
     
-    def toggle_pause(self):
-        if self.app_state == APP_STATES['RUNNING']:
-            self.pause_automation()
-        elif self.app_state == APP_STATES['PAUSED']:
-            self.resume_automation()
-
     def start_automation(self):
         if not self.is_authenticated:
             QMessageBox.warning(self, "Erro", "Por favor, autentique-se primeiro!")
             return
 
         self.app_state = APP_STATES['RUNNING']
-        self.start_button.setText("Parar")
-        self.start_button.setStyleSheet("""
-            font-size: 16px;
-            background-color: #dc3545;
-            color: white;
-            border-radius: 5px;
-            padding: 12px 24px;
+        self.start_stop_button.setText("Parar Automação")
+        self.start_stop_button.setStyleSheet("""
+            QPushButton {
+                background-color: #dc3545;
+                color: white;
+                border: none;
+                border-radius: 5px;
+                padding: 12px;
+                font-size: 16px;
+                font-weight: bold;
+            }
+            QPushButton:hover {
+                background-color: #c82333;
+            }
         """)
-        self.pause_button.setEnabled(True)
         self.status_label.setText("Status: Em execução")
 
         self.automation_thread = AutomationThread(self)
@@ -745,37 +724,29 @@ class MainWindow(QMainWindow):
         self.automation_thread.battles_update.connect(self.update_battles)
         self.automation_thread.start()
 
-    def pause_automation(self):
-        if self.automation_thread:
-            self.app_state = APP_STATES['PAUSED']
-            self.automation_thread.pause()
-            self.pause_button.setText("Continuar")
-            self.status_label.setText("Status: Pausado")
-
-    def resume_automation(self):
-        if self.automation_thread:
-            self.app_state = APP_STATES['RUNNING']
-            self.automation_thread.resume()
-            self.pause_button.setText("Pausar")
-            self.status_label.setText("Status: Em execução")
-
     def stop_automation(self):
         if self.automation_thread:
             self.automation_thread.stop()
+            self.automation_thread.terminate()  # Force thread termination
             self.automation_thread.wait()
             self.automation_thread = None
 
         self.app_state = APP_STATES['STOPPED']
-        self.start_button.setText("Iniciar Automação")
-        self.start_button.setStyleSheet("""
-            font-size: 16px;
-            background-color: #4CAF50;
-            color: white;
-            border-radius: 5px;
-            padding: 12px 24px;
+        self.start_stop_button.setText("Iniciar Automação")
+        self.start_stop_button.setStyleSheet("""
+            QPushButton {
+                background-color: #4CAF50;
+                color: white;
+                border: none;
+                border-radius: 5px;
+                padding: 12px;
+                font-size: 16px;
+                font-weight: bold;
+            }
+            QPushButton:hover {
+                background-color: #45a049;
+            }
         """)
-        self.pause_button.setEnabled(False)
-        self.pause_button.setText("Pausar")
         self.status_label.setText("Status: Parado")
 
     def update_status(self, message):
