@@ -15,6 +15,7 @@ import io
 # Importe as funções e variáveis necessárias dos outros arquivos
 from variables import WINDOW_NAME, RESOLUCAO_PADRAO, SCREENSHOTS_DIR, IMAGE_PATHS, APP_STATES
 from functions import log, is_image_on_screen, dividir_e_desenhar_contornos, initiate_battle, battle_actions, refill_digimons
+from database import Database
 
 class AutomationThread(QThread):
     status_update = pyqtSignal(str)
@@ -228,6 +229,8 @@ class MainWindow(QMainWindow):
             'group2': '',
             'group3': ''
         }
+        
+        self.db = Database()
         
         self.setup_ui()
         self.carregar_imagens()
@@ -509,75 +512,6 @@ class MainWindow(QMainWindow):
         self.setup_capture_cards(capture_layout)
         self.layout_configurar.addWidget(capture_group)
 
-    def toggle_automation(self):
-        if self.app_state == APP_STATES['STOPPED']:
-            self.start_automation()            
-        else:
-            self.stop_automation()
-    
-    def toggle_pause(self):
-        if self.app_state == APP_STATES['RUNNING']:
-            self.pause_automation()
-        elif self.app_state == APP_STATES['PAUSED']:
-            self.resume_automation()
-
-    def start_automation(self):
-        if not self.is_authenticated:
-            QMessageBox.warning(self, "Erro", "Por favor, autentique-se primeiro!")
-            return
-
-        self.app_state = APP_STATES['RUNNING']
-        self.start_button.setText("Parar")
-        self.start_button.setStyleSheet("""
-            font-size: 16px;
-            background-color: #dc3545;
-            color: white;
-            border-radius: 5px;
-            padding: 12px 24px;
-        """)
-        self.pause_button.setEnabled(True)
-        self.status_label.setText("Status: Em execução")
-
-        self.automation_thread = AutomationThread(self)
-        self.automation_thread.status_update.connect(self.update_status)
-        self.automation_thread.start()
-
-    def pause_automation(self):
-        if self.automation_thread:
-            self.app_state = APP_STATES['PAUSED']
-            self.automation_thread.pause()
-            self.pause_button.setText("Continuar")
-            self.status_label.setText("Status: Pausado")
-
-    def resume_automation(self):
-        if self.automation_thread:
-            self.app_state = APP_STATES['RUNNING']
-            self.automation_thread.resume()
-            self.pause_button.setText("Pausar")
-            self.status_label.setText("Status: Em execução")
-
-    def stop_automation(self):
-        if self.automation_thread:
-            self.automation_thread.stop()
-            self.automation_thread.wait()
-            self.automation_thread = None
-
-        self.app_state = APP_STATES['STOPPED']
-        self.start_button.setText("Iniciar Automação")
-        self.start_button.setStyleSheet("""
-            font-size: 16px;
-            background-color: #4CAF50;
-            color: white;
-            border-radius: 5px;
-            padding: 12px 24px;
-        """)
-        self.pause_button.setEnabled(False)
-        self.pause_button.setText("Pausar")
-        self.status_label.setText("Status: Parado")
-
-    def update_status(self, message):
-        self.status_label.setText(f"Status: {message}")
-       
     def setup_resolution_config(self, layout):
         config_layout = QHBoxLayout()
         layout.addLayout(config_layout)
@@ -643,27 +577,6 @@ class MainWindow(QMainWindow):
             battle_keys_layout.addLayout(group_layout)
 
         layout.addWidget(battle_keys_group)
-
-    def update_battle_key(self, key, group):
-        button = self.sender()
-        is_checked = button.isChecked()
-
-        # If the button was unchecked, clear the key for this group
-        if not is_checked:
-            self.battle_keys[group] = ''
-            return
-
-        # Update the key for this group
-        self.battle_keys[group] = key
-
-        # Uncheck other buttons in the same group
-        parent = button.parent()
-        for other_button in parent.findChildren(KeyButton):
-            if other_button != button and other_button.property('group') == group:
-                other_button.setChecked(False)
-
-        # Print current state of battle keys
-        print("Current battle keys:", self.battle_keys)
 
     def setup_capture_cards(self, layout):
         self.image_filenames = [
@@ -749,6 +662,99 @@ class MainWindow(QMainWindow):
         ]
         return titles[index] if index < len(titles) else "Título Desconhecido"
 
+    def authenticate(self):
+        username = self.username_input.text()
+        password = self.password_input.text()
+        
+        try:
+            is_valid, error_message = self.db.validate_user(username, password)
+            
+            if is_valid:
+                self.is_authenticated = True
+                self.tabs.setTabEnabled(1, True)
+                self.tabs.setTabEnabled(2, True)
+                self.tabs.setCurrentIndex(1)  # Muda para a aba "Jogar" após o login
+                QMessageBox.information(self, "Sucesso", "Login realizado com sucesso!")
+            else:
+                error_msg = error_message if error_message else "Credenciais inválidas!"
+                QMessageBox.warning(self, "Erro", error_msg)
+        except Exception as e:
+            QMessageBox.critical(self, "Erro", f"Erro ao conectar ao banco de dados: {str(e)}")
+
+    def closeEvent(self, event):
+        if hasattr(self, 'db'):
+            self.db.close()
+        super().closeEvent(event)
+
+    def toggle_automation(self):
+        if self.app_state == APP_STATES['STOPPED']:
+            self.start_automation()            
+        else:
+            self.stop_automation()
+    
+    def toggle_pause(self):
+        if self.app_state == APP_STATES['RUNNING']:
+            self.pause_automation()
+        elif self.app_state == APP_STATES['PAUSED']:
+            self.resume_automation()
+
+    def start_automation(self):
+        if not self.is_authenticated:
+            QMessageBox.warning(self, "Erro", "Por favor, autentique-se primeiro!")
+            return
+
+        self.app_state = APP_STATES['RUNNING']
+        self.start_button.setText("Parar")
+        self.start_button.setStyleSheet("""
+            font-size: 16px;
+            background-color: #dc3545;
+            color: white;
+            border-radius: 5px;
+            padding: 12px 24px;
+        """)
+        self.pause_button.setEnabled(True)
+        self.status_label.setText("Status: Em execução")
+
+        self.automation_thread = AutomationThread(self)
+        self.automation_thread.status_update.connect(self.update_status)
+        self.automation_thread.start()
+
+    def pause_automation(self):
+        if self.automation_thread:
+            self.app_state = APP_STATES['PAUSED']
+            self.automation_thread.pause()
+            self.pause_button.setText("Continuar")
+            self.status_label.setText("Status: Pausado")
+
+    def resume_automation(self):
+        if self.automation_thread:
+            self.app_state = APP_STATES['RUNNING']
+            self.automation_thread.resume()
+            self.pause_button.setText("Pausar")
+            self.status_label.setText("Status: Em execução")
+
+    def stop_automation(self):
+        if self.automation_thread:
+            self.automation_thread.stop()
+            self.automation_thread.wait()
+            self.automation_thread = None
+
+        self.app_state = APP_STATES['STOPPED']
+        self.start_button.setText("Iniciar Automação")
+        self.start_button.setStyleSheet("""
+            font-size: 16px;
+            background-color: #4CAF50;
+            color: white;
+            border-radius: 5px;
+            padding: 12px 24px;
+        """)
+        self.pause_button.setEnabled(False)
+        self.pause_button.setText("Pausar")
+        self.status_label.setText("Status: Parado")
+
+    def update_status(self, message):
+        self.status_label.setText(f"Status: {message}")
+
     def escolher_resolucao(self):
         resolucao_selecionada = self.resolucao_combobox.currentText()
         largura, altura = map(int, resolucao_selecionada.split("x"))
@@ -779,9 +785,9 @@ class MainWindow(QMainWindow):
                 f.write(imagem_data)
 
     def capturar_tela_e_salvar(self, x_inicio, y_inicio, x_fim, y_fim):
-        hwnd = win32gui.FindWindow(None, 'Digimon SuperRumble  ')
+        hwnd = win32gui.FindWindow(None, WINDOW_NAME)
         if hwnd == 0:
-            QMessageBox.warning(self, "Erro", "Janela 'Digimon SuperRumble' não encontrada.")
+            QMessageBox.warning(self, "Erro", f"Janela '{WINDOW_NAME}' não encontrada.")
             return None
 
         resolucao_selecionada = self.resolucao_combobox.currentText()
@@ -814,22 +820,31 @@ class MainWindow(QMainWindow):
             return None
 
     def carregar_imagens(self):
-        for index, filename in enumerate(self.image_filenames):
-            filepath = os.path.join(SCREENSHOTS_DIR, filename)
-            if os.path.exists(filepath):
-                imagem = QImage(filepath)
+        for i, card in enumerate(self.cards):
+            image_path = os.path.join(SCREENSHOTS_DIR, self.image_filenames[i])
+            if os.path.exists(image_path):
+                imagem = QImage(image_path)
                 pixmap = QPixmap.fromImage(imagem)
-                self.cards[index].label.setPixmap(pixmap)
+                scaled_pixmap = pixmap.scaled(150, 100, Qt.KeepAspectRatio, Qt.SmoothTransformation)
+                card.label.setPixmap(scaled_pixmap)
 
-    def authenticate(self):
-        username = self.username_input.text()
-        password = self.password_input.text()
-        
-        if username == "Admin" and password == "123":
-            self.is_authenticated = True
-            self.tabs.setTabEnabled(1, True)
-            self.tabs.setTabEnabled(2, True)
-            self.tabs.setCurrentIndex(1)  # Muda para a aba "Jogar" após o login
-            QMessageBox.information(self, "Sucesso", "Login realizado com sucesso!")
-        else:
-            QMessageBox.warning(self, "Erro", "Credenciais inválidas!")
+    def update_battle_key(self, key, group):
+        button = self.sender()
+        is_checked = button.isChecked()
+
+        # If the button was unchecked, clear the key for this group
+        if not is_checked:
+            self.battle_keys[group] = ''
+            return
+
+        # Update the key for this group
+        self.battle_keys[group] = key
+
+        # Uncheck other buttons in the same group
+        parent = button.parent()
+        for other_button in parent.findChildren(KeyButton):
+            if other_button != button and other_button.property('group') == group:
+                other_button.setChecked(False)
+
+        # Print current state of battle keys
+        print("Current battle keys:", self.battle_keys)
