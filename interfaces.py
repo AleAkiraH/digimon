@@ -11,6 +11,7 @@ import win32con
 import os
 from PIL import ImageGrab
 import io
+from datetime import datetime, timedelta
 
 # Importe as funções e variáveis necessárias dos outros arquivos
 from variables import WINDOW_NAME, RESOLUCAO_PADRAO, SCREENSHOTS_DIR, IMAGE_PATHS, APP_STATES
@@ -21,6 +22,7 @@ class AutomationThread(QThread):
     status_update = pyqtSignal(str)
     time_update = pyqtSignal(str)
     battles_update = pyqtSignal(int)
+    battles_per_minute_update = pyqtSignal(float)  # New signal
     
     def __init__(self, main_window):
         super().__init__()
@@ -28,10 +30,10 @@ class AutomationThread(QThread):
         self.is_running = True
         self.is_paused = False
         self.battles_count = 0
-        self.start_time = time.time() # Initialize start_time here
-        
+        self.start_time = datetime.now()  # Changed to datetime
+        self.last_battle_time = self.start_time
+    
     def run(self):   
-        
         while self.is_running:
             if self.is_paused:
                 time.sleep(0.1)
@@ -41,7 +43,7 @@ class AutomationThread(QThread):
                 if is_image_on_screen(IMAGE_PATHS['captcha_exists']):
                     dividir_e_desenhar_contornos()
                 
-                elapsed_time = time.time() - self.start_time
+                elapsed_time = (datetime.now() - self.start_time).total_seconds()
                 elapsed_hours = int(elapsed_time // 3600)
                 elapsed_minutes = int((elapsed_time % 3600) // 60)
                 elapsed_seconds = int(elapsed_time % 60)
@@ -106,7 +108,11 @@ class AutomationThread(QThread):
                         dividir_e_desenhar_contornos()
                         
                     battle_actions(IMAGE_PATHS['battle_detection'], IMAGE_PATHS['battle_finish'], self.main_window.battle_keys)
-                    self.battles_count +=1
+                    self.battles_count += 1
+                    current_time = datetime.now()
+                    elapsed_time = (current_time - self.start_time).total_seconds() / 60  # in minutes
+                    battles_per_minute = self.battles_count / elapsed_time if elapsed_time > 0 else 0
+                    self.battles_per_minute_update.emit(battles_per_minute)
                     
                     if is_image_on_screen(IMAGE_PATHS['captcha_exists']):
                         dividir_e_desenhar_contornos()
@@ -126,8 +132,11 @@ class AutomationThread(QThread):
             except Exception as e:
                 self.status_update.emit(f"Erro na automação: {str(e)}")
             
-            self.time_update.emit(elapsed_time_str) # Moved here
-            self.battles_update.emit(self.battles_count) # Added here
+            current_time = datetime.now()
+            elapsed_time = current_time - self.start_time
+            elapsed_time_str = str(elapsed_time).split('.')[0]  # Remove microseconds
+            self.time_update.emit(elapsed_time_str)
+            self.battles_update.emit(self.battles_count)
             time.sleep(0.1)  # Previne uso excessivo de CPU
 
     def stop(self):
@@ -140,8 +149,9 @@ class AutomationThread(QThread):
         self.is_paused = False
 
     def reset(self): # Added reset method
-        self.start_time = time.time()
+        self.start_time = datetime.now()
         self.battles_count = 0
+        self.last_battle_time = self.start_time
 
 class KeyButton(QPushButton):
     def __init__(self, key, parent=None):
@@ -442,6 +452,16 @@ class MainWindow(QMainWindow):
         self.battles_label.setAlignment(Qt.AlignCenter)
         content_layout.addWidget(self.battles_label)
         
+        # Add new label for battles per minute
+        self.battles_per_minute_label = QLabel("Batalhas por minuto: 0.00")
+        self.battles_per_minute_label.setStyleSheet("""
+            font-size: 14px;
+            color: #666;
+            margin: 5px 0;
+        """)
+        self.battles_per_minute_label.setAlignment(Qt.AlignCenter)
+        content_layout.addWidget(self.battles_per_minute_label)
+
         # Buttons container
         buttons_container = QWidget()
         buttons_layout = QHBoxLayout(buttons_container)
@@ -728,6 +748,7 @@ class MainWindow(QMainWindow):
             self.automation_thread.status_update.connect(self.update_status)
             self.automation_thread.time_update.connect(self.update_time)
             self.automation_thread.battles_update.connect(self.update_battles)
+            self.automation_thread.battles_per_minute_update.connect(self.update_battles_per_minute)
             self.automation_thread.start()
         else:
             self.automation_thread.reset()
@@ -736,6 +757,7 @@ class MainWindow(QMainWindow):
         # Reset the labels
         self.update_time("00:00:00")
         self.update_battles(0)
+        self.update_battles_per_minute(0.00)
 
     def stop_automation(self):
         if self.automation_thread:
@@ -763,6 +785,7 @@ class MainWindow(QMainWindow):
         self.status_label.setText("Status: Parado")
         self.update_time("00:00:00")
         self.update_battles(0)
+        self.update_battles_per_minute(0.00)
 
     def update_status(self, message):
         self.status_label.setText(f"Status: {message}")
@@ -772,6 +795,9 @@ class MainWindow(QMainWindow):
 
     def update_battles(self, battles):
         self.battles_label.setText(f"Batalhas realizadas: {battles}")
+
+    def update_battles_per_minute(self, battles_per_minute):
+        self.battles_per_minute_label.setText(f"Batalhas por minuto: {battles_per_minute:.2f}")
 
     def escolher_resolucao(self):
         resolucao_selecionada = self.resolucao_combobox.currentText()
@@ -887,11 +913,4 @@ class MainWindow(QMainWindow):
 
         # Print current state of battle keys
         print("Current battle keys:", self.battle_keys)
-
-
-if __name__ == "__main__":
-    app = QApplication(sys.argv)
-    window = MainWindow()
-    window.show()
-    sys.exit(app.exec_())
 
