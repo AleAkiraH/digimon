@@ -75,7 +75,7 @@ class AutomationThread(QThread):
             if self.is_paused:
                 time.sleep(0.1)
                 continue
-            velocidade = self.mouse_speed_combobox.currentText()
+            velocidade = self.main_window.mouse_speed_combobox.currentText()
             try:
                 if is_image_on_screen(IMAGE_PATHS['captcha_exists']):
                     
@@ -420,9 +420,9 @@ class MainWindow(QMainWindow):
         form_layout.addWidget(self.login_status)
         
         # Login button
-        login_button = QPushButton("Login")
-        login_button.setCursor(Qt.PointingHandCursor)
-        login_button.setStyleSheet("""
+        self.login_button = QPushButton("Login")
+        self.login_button.setCursor(Qt.PointingHandCursor)
+        self.login_button.setStyleSheet("""
             QPushButton {
                 background-color: #4CAF50;
                 color: white;
@@ -437,8 +437,8 @@ class MainWindow(QMainWindow):
                 background-color: #45a049;
             }
         """)
-        login_button.clicked.connect(self.authenticate)
-        form_layout.addWidget(login_button)
+        self.login_button.clicked.connect(self.authenticate)
+        form_layout.addWidget(self.login_button)
         
         container_layout.addWidget(login_form)
         container_layout.addStretch()
@@ -607,6 +607,7 @@ class MainWindow(QMainWindow):
         self.setup_resolution_config(general_layout)
         self.setup_digievolution_config(general_layout)
         self.setup_battle_keys_config(general_layout)
+        self.setup_speed_mouse(general_layout)  # Adiciona a configuração da velocidade do mouse
         self.layout_configurar.addWidget(general_group)
 
         capture_group = QGroupBox("Captura de Imagens")
@@ -627,8 +628,6 @@ class MainWindow(QMainWindow):
         self.mouse_speed_combobox.addItems(["lento", "normal", "rapido"])
         self.mouse_speed_combobox.setFixedWidth(120)
         layout.addWidget(self.mouse_speed_combobox)
-
-        self.layout_configurar.addWidget(self.mouse_speed_combobox)
 
     def setup_resolution_config(self, layout):
         config_layout = QHBoxLayout()
@@ -784,6 +783,9 @@ class MainWindow(QMainWindow):
         username = self.username_input.text().lower()
         password = self.password_input.text()
 
+        # Oculta o botão de login imediatamente após o clique
+        self.login_button.hide()
+
         # Mostra a barra de progresso e o status label
         self.login_progress.show()
         self.login_status.show()
@@ -797,6 +799,9 @@ class MainWindow(QMainWindow):
         self.login_thread.start()
 
     def handle_login_result(self, success, error_message):
+        # Exibe o botão de login novamente
+        self.login_button.show()
+
         if success:
             self.login_progress.setValue(99)  # Preenche a barra de progresso
             self.login_status.setText("Login realizado com sucesso!")
