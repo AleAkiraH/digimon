@@ -2,7 +2,7 @@ import sys
 from PyQt5.QtWidgets import (QApplication, QMainWindow, QMessageBox, QVBoxLayout, 
     QHBoxLayout, QWidget, QLabel, QPushButton, QComboBox, QGroupBox, QTabWidget, 
     QLineEdit, QScrollArea, QFrame, QProgressBar)
-from PyQt5.QtCore import Qt, QThread, pyqtSignal, QTimer
+from PyQt5.QtCore import Qt, QThread, pyqtSignal, QTimer, QObject
 from PyQt5.QtGui import QPixmap, QImage
 
 import pyautogui
@@ -19,6 +19,17 @@ from datetime import datetime, timedelta
 from variables import WINDOW_NAME, RESOLUCAO_PADRAO, SCREENSHOTS_DIR, IMAGE_PATHS, APP_STATES
 from functions import log, is_image_on_screen, dividir_e_desenhar_contornos, initiate_battle, battle_actions, refill_digimons
 from database import Database
+
+class AutomationWorker(QObject):
+    finished = pyqtSignal()
+
+    def __init__(self, main_window):
+        super().__init__()
+        self.main_window = main_window
+
+    def run(self):
+        self.main_window.start_automation()
+        self.finished.emit()
 
 class LoginThread(QThread):
     finished = pyqtSignal(bool, str)
@@ -76,12 +87,10 @@ class AutomationThread(QThread):
                 time.sleep(0.1)
                 continue
             
-            velocidade = self.main_window.mouse_speed_combobox.currentText()
-            
             try:
                 if is_image_on_screen(IMAGE_PATHS['captcha_exists']):
                     
-                    dividir_e_desenhar_contornos(velocidade)
+                    dividir_e_desenhar_contornos()
                 
                 elapsed_time = (datetime.now() - self.start_time).total_seconds()
                 elapsed_hours = int(elapsed_time // 3600)
@@ -93,7 +102,7 @@ class AutomationThread(QThread):
                 
                 for _ in range(3):
                     if is_image_on_screen(IMAGE_PATHS['captcha_exists']):
-                        dividir_e_desenhar_contornos(velocidade)
+                        dividir_e_desenhar_contornos()
                 
                 time.sleep(1)
                 for _ in range(4):
@@ -102,7 +111,7 @@ class AutomationThread(QThread):
                 time.sleep(1)
 
                 if is_image_on_screen(IMAGE_PATHS['captcha_exists']):
-                    dividir_e_desenhar_contornos(velocidade)
+                    dividir_e_desenhar_contornos()
                 
                 self.status_update.emit("Tela de digimons aberta...")
                 if is_image_on_screen(IMAGE_PATHS['evp_terminado']):
@@ -116,7 +125,7 @@ class AutomationThread(QThread):
                 battle_start_image_HP_Try = 3
                 while not is_image_on_screen(IMAGE_PATHS['battle_start_hp']) and self.is_running and not self.is_paused:
                     if is_image_on_screen(IMAGE_PATHS['captcha_exists']):
-                        dividir_e_desenhar_contornos(velocidade)
+                        dividir_e_desenhar_contornos()
                     if battle_start_image_HP_Try == 0:
                         self.status_update.emit("Imagem de inicio de batalha não encontrada.")
                         if not is_image_on_screen(IMAGE_PATHS['janela_digimon']):
@@ -140,12 +149,12 @@ class AutomationThread(QThread):
                         break
                     
                     if is_image_on_screen(IMAGE_PATHS['captcha_exists']):
-                        dividir_e_desenhar_contornos(velocidade)
+                        dividir_e_desenhar_contornos()
                         
                     initiate_battle(IMAGE_PATHS['battle_detection'], self.main_window.battle_keys)
                     
                     if is_image_on_screen(IMAGE_PATHS['captcha_exists']):
-                        dividir_e_desenhar_contornos(velocidade)
+                        dividir_e_desenhar_contornos()
                         
                     battle_actions(IMAGE_PATHS['battle_detection'], IMAGE_PATHS['battle_finish'], self.main_window.battle_keys)
                     self.battles_count += 1
@@ -155,7 +164,7 @@ class AutomationThread(QThread):
                     self.battles_per_minute_update.emit(battles_per_minute)
                     
                     if is_image_on_screen(IMAGE_PATHS['captcha_exists']):
-                        dividir_e_desenhar_contornos(velocidade)
+                        dividir_e_desenhar_contornos()
                 else:
                     if not is_image_on_screen(IMAGE_PATHS['battle_start_evp']):
                         pyautogui.press('v')
@@ -163,7 +172,7 @@ class AutomationThread(QThread):
                             if not self.is_running or self.is_paused:
                                 break
                             if is_image_on_screen(IMAGE_PATHS['captcha_exists']):
-                                dividir_e_desenhar_contornos(velocidade)
+                                dividir_e_desenhar_contornos()
                             pyautogui.press('5')
                             time.sleep(0.5)                       
                         pyautogui.press('v')
@@ -608,7 +617,6 @@ class MainWindow(QMainWindow):
         
         self.setup_resolution_config(general_layout)
         self.setup_digievolution_config(general_layout)
-        self.setup_speed_mouse(general_layout)  # Adiciona a configuração da velocidade do mouse
         self.layout_configurar.addWidget(general_group)
 
         # Adiciona diretamente a configuração das teclas sem a group box
@@ -651,20 +659,7 @@ class MainWindow(QMainWindow):
         self.digievolucao_combobox.setFixedWidth(120)
         self.digievolucao_combobox.currentIndexChanged.connect(self.atualizar_digievolucao)
         digievolucao_layout.addWidget(self.digievolucao_combobox)
-        digievolucao_layout.addStretch()
-    
-    def setup_speed_mouse(self, layout):
-        mouse_speed_label = QLabel("Velocidade do Mouse:")
-        mouse_speed_label.setFixedWidth(150)
-        layout.addWidget(mouse_speed_label)
-
-        self.mouse_speed_combobox = QComboBox()
-        self.mouse_speed_combobox.addItems(["rapido", "normal", "lento"])
-        self.mouse_speed_combobox.setFixedWidth(120)
-
-        layout.addWidget(self.mouse_speed_combobox)
-
-        layout.addStretch()
+        digievolucao_layout.addStretch()   
 
     def setup_battle_keys_config(self, layout):
         battle_keys_layout = QVBoxLayout()
@@ -804,10 +799,11 @@ class MainWindow(QMainWindow):
         self.login_thread.start()
 
     def handle_login_result(self, success, error_message):
+        # Exibe o botão de login novamente
+
         if success:
             self.login_progress.setValue(99)  # Preenche a barra de progresso
             self.login_status.setText("Login realizado com sucesso!")
-            self.login_button.show()
             self.is_authenticated = True
             self.current_user = self.username_input.text().lower()
             self.license_expiration = self.db.get_license_expiration(self.current_user)
@@ -824,6 +820,7 @@ class MainWindow(QMainWindow):
         # Esconde a barra de progresso após o login
         self.login_progress.hide()
         self.login_status.hide()
+        self.login_button.show()
 
     def closeEvent(self, event):
         if hasattr(self, 'db'):
@@ -832,14 +829,28 @@ class MainWindow(QMainWindow):
 
     def toggle_automation(self):
         self.start_stop_button.hide()  # Esconde o botão imediatamente após o clique
-        QTimer.singleShot(100, self._toggle_automation)  # Aguarda um breve momento antes de iniciar a automação
+        QTimer.singleShot(100, self._start_automation_thread)  # Aguarda um breve momento antes de iniciar a automação  # Aguarda um breve momento antes de iniciar a automação
 
-    def _toggle_automation(self):
+    def _start_automation_thread(self):
         if self.app_state == APP_STATES['STOPPED']:
-            self.start_automation()
+            self.start_automation_thread = QThread()
+            self.start_automation_worker = AutomationWorker(self)
+            self.start_automation_worker.moveToThread(self.start_automation_thread)
+            
+            self.start_automation_thread.started.connect(self.start_automation_worker.run)
+            self.start_automation_worker.finished.connect(self.start_automation_thread.quit)
+            self.start_automation_worker.finished.connect(self.start_automation_worker.deleteLater)
+            self.start_automation_thread.finished.connect(self.start_automation_thread.deleteLater)
+            
+            self.start_automation_worker.finished.connect(self.on_automation_started)
+            
+            self.start_automation_thread.start()
         else:
             self.stop_automation()
 
+    def on_automation_started(self):
+        self.start_stop_button.show()
+        
     def hide_start_stop_button(self):
         self.start_stop_button.hide()
     
@@ -882,8 +893,48 @@ class MainWindow(QMainWindow):
         self.update_time("00:00:00")
         self.update_battles(0)
         self.update_battles_per_minute(0.00)
-        self.start_stop_button.show()
+        self.start_stop_button.show()  # Mostra o botão "Parar Automação" ao final
 
+    def start_automation(self):
+        if not self.is_authenticated:
+            QMessageBox.warning(self, "Erro", "Por favor, autentique-se primeiro!")
+            self.start_stop_button.show()  # Mostra o botão novamente em caso de erro
+            return
+
+        self.db.record_action(self.current_user, "inicio automacao")
+        self.app_state = APP_STATES['RUNNING']
+        self.start_stop_button.setText("Parar Automação")
+        self.start_stop_button.setStyleSheet("""
+            QPushButton {
+                background-color: #dc3545;
+                color: white;
+                border: none;
+                border-radius: 5px;
+                padding: 12px;
+                font-size: 16px;
+                font-weight: bold;
+            }
+            QPushButton:hover {
+                background-color: #c82333;
+            }
+        """)
+        self.status_label.setText("Status: Em execução")
+
+        if self.automation_thread is None:
+            self.automation_thread = AutomationThread(self)
+            self.automation_thread.status_update.connect(self.update_status)
+            self.automation_thread.time_update.connect(self.update_time)
+            self.automation_thread.battles_update.connect(self.update_battles)
+            self.automation_thread.battles_per_minute_update.connect(self.update_battles_per_minute)
+            self.automation_thread.start()
+        else:
+            self.automation_thread.reset()
+            self.automation_thread.resume()
+
+        self.update_time("00:00:00")
+        self.update_battles(0)
+        self.update_battles_per_minute(0.00)
+        
     def stop_automation(self):
         if self.automation_thread:
             self.automation_thread.stop()

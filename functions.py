@@ -42,14 +42,9 @@ def is_image_on_screen(image_path, confidence=0.85):
     location = pyautogui.locateCenterOnScreen(image_path, confidence=confidence)
     return location is not None
 
-def mover_mouse(x_inicial, y_inicial, x_final, y_final, velocidade='normal'):
-    """Move mouse de um ponto a outro com diferentes velocidades"""
-    num_etapas_dict = {
-        'lento': 60,
-        'normal': 30,
-        'rapido': 10
-    }
-    num_etapas = num_etapas_dict.get(velocidade, 50)
+def mover_mouse(x_inicial, y_inicial, x_final, y_final):
+    """Move mouse de um ponto a outro com diferentes velocidades"""    
+    num_etapas = 15
     x_step = (x_final - x_inicial) / num_etapas
     y_step = (y_final - y_inicial) / num_etapas
     
@@ -112,7 +107,7 @@ def dividir_e_desenhar_contornos(velocidade='normal'):
             x_inicial, y_inicial = 296, 438  # centro do objeto a ser arrastado do captcha
 
             pyautogui.mouseDown(x=x_inicial, y=y_inicial)
-            mover_mouse(x_inicial, y_inicial, x_final, y_final, velocidade)
+            mover_mouse(x_inicial, y_inicial, x_final, y_final)
 
             log(f"Mouse movido para o quadrado azul.")
             time.sleep(1)
