@@ -65,7 +65,18 @@ class Database:
         
         return True, None 
     
+    def record_action(self, username, acao):
+        current_time = self.get_current_date_from_internet()
+        action_record = {
+            "username": username,
+            "acao": acao,
+            "timestamp": current_time
+        }
+        self.db.historico.insert_one(action_record)
+        print(f"Ação '{acao}' registrada para o usuário {username} em {current_time}")
+    
 
         
     def close(self):
         self.client.close()
+

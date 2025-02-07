@@ -242,6 +242,7 @@ class MainWindow(QMainWindow):
         """)
         
         self.is_authenticated = False
+        self.current_user = None  # Added current_user attribute
         self.automation_thread = None
         self.app_state = APP_STATES['STOPPED']
         
@@ -699,10 +700,14 @@ class MainWindow(QMainWindow):
             
             if is_valid:
                 self.is_authenticated = True
+                self.current_user = username  # Added line to set current_user
                 self.tabs.setTabEnabled(1, True)
                 self.tabs.setTabEnabled(2, True)
                 self.tabs.setCurrentIndex(1)  # Muda para a aba "Jogar" após o login
                 QMessageBox.information(self, "Sucesso", "Login realizado com sucesso!")
+            
+                # Record the login
+                self.db.record_action(username, "login")  # Updated line
             else:
                 error_msg = error_message if error_message else "Credenciais inválidas!"
                 QMessageBox.warning(self, "Erro", error_msg)
@@ -725,7 +730,9 @@ class MainWindow(QMainWindow):
             QMessageBox.warning(self, "Erro", "Por favor, autentique-se primeiro!")
             return
 
+        self.db.record_action(self.current_user, "inicio automacao")  # Updated line
         self.app_state = APP_STATES['RUNNING']
+        # ... resto do método
         self.start_stop_button.setText("Parar Automação")
         self.start_stop_button.setStyleSheet("""
             QPushButton {
