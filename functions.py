@@ -42,10 +42,14 @@ def is_image_on_screen(image_path, confidence=0.85):
     location = pyautogui.locateCenterOnScreen(image_path, confidence=confidence)
     return location is not None
 
-def mover_mouse_lento(x_inicial, y_inicial, x_final, y_final):
-    """Move mouse lentamente de um ponto a outro"""
-    # Define o número de etapas para o movimento
-    num_etapas = 100  # Você pode ajustar esse número conforme necessário
+def mover_mouse(x_inicial, y_inicial, x_final, y_final, velocidade='normal'):
+    """Move mouse de um ponto a outro com diferentes velocidades"""
+    num_etapas_dict = {
+        'lento': 100,
+        'normal': 50,
+        'rapido': 25
+    }
+    num_etapas = num_etapas_dict.get(velocidade, 50)
     x_step = (x_final - x_inicial) / num_etapas
     y_step = (y_final - y_inicial) / num_etapas
     
@@ -62,18 +66,18 @@ def calcular_area_homogenea(quadrado):
     unique_pixels, counts = np.unique(pixels, axis=0, return_counts=True)
     return max(counts)
 
-def dividir_e_desenhar_contornos():    
+def dividir_e_desenhar_contornos(velocidade='normal'):    
     """Process captcha by dividing and drawing contours"""
     left = min(int(COORDINATES['x_inicial']), int(COORDINATES['x_final'])) 
     top = min(int(COORDINATES['y_inicial']), int(COORDINATES['y_final']))
     width = abs(int(COORDINATES['x_final']) - int(COORDINATES['x_inicial']))
     height = abs(int(COORDINATES['y_final']) - int(COORDINATES['y_inicial']))
-    
+
     screenshot = pyautogui.screenshot(region=(left, top, width, height))
     image = np.array(screenshot)
     image = cv2.cvtColor(image, cv2.COLOR_RGB2BGR)
     cv2.imwrite("CaptchaSolution\\screenshot.png", image)
-    
+
     altura, largura, _ = image.shape
     tamanho_quadrado_largura = largura // 8
     tamanho_quadrado_altura = altura // 8
@@ -90,7 +94,7 @@ def dividir_e_desenhar_contornos():
 
             quadrado = image[y_inicio:y_fim, x_inicio:x_fim]
             homogeneidade = calcular_area_homogenea(quadrado)
-            
+
             if homogeneidade > max_homogeneidade:
                 max_homogeneidade = homogeneidade
                 quadrado_mais_homogeneo = (x_inicio, y_inicio, x_fim, y_fim)
@@ -100,17 +104,17 @@ def dividir_e_desenhar_contornos():
         quadrado_azul = image[y_inicio:y_fim, x_inicio:x_fim]
         temp_image_path = "CaptchaSolution\\quadrado_azul.png"
         cv2.imwrite(temp_image_path, quadrado_azul)
-        
+
         location = pyautogui.locateCenterOnScreen(temp_image_path, confidence=0.85)
         if location:
             x_final, y_final = location
-            x_inicial, y_inicial = 296, 438 # centro do objeto a ser arrastado do captcha
+            x_inicial, y_inicial = 296, 438  # centro do objeto a ser arrastado do captcha
 
             pyautogui.mouseDown(x=x_inicial, y=y_inicial)
-            mover_mouse_lento(x_inicial, y_inicial, x_final, y_final)
-            
+            mover_mouse(x_inicial, y_inicial, x_final, y_final, velocidade)
+
             log(f"Mouse movido para o quadrado azul.")
-            time.sleep(5)
+            time.sleep(1)
         else:
             log("Falha ao localizar o quadrado azul na tela.")
 

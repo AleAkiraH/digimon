@@ -75,10 +75,11 @@ class AutomationThread(QThread):
             if self.is_paused:
                 time.sleep(0.1)
                 continue
-
+            velocidade = self.mouse_speed_combobox.currentText()
             try:
                 if is_image_on_screen(IMAGE_PATHS['captcha_exists']):
-                    dividir_e_desenhar_contornos()
+                    
+                    dividir_e_desenhar_contornos(velocidade)
                 
                 elapsed_time = (datetime.now() - self.start_time).total_seconds()
                 elapsed_hours = int(elapsed_time // 3600)
@@ -90,7 +91,7 @@ class AutomationThread(QThread):
                 
                 for _ in range(3):
                     if is_image_on_screen(IMAGE_PATHS['captcha_exists']):
-                        dividir_e_desenhar_contornos()
+                        dividir_e_desenhar_contornos(velocidade)
                 
                 time.sleep(1)
                 for _ in range(4):
@@ -99,7 +100,7 @@ class AutomationThread(QThread):
                 time.sleep(1)
 
                 if is_image_on_screen(IMAGE_PATHS['captcha_exists']):
-                    dividir_e_desenhar_contornos()
+                    dividir_e_desenhar_contornos(velocidade)
                 
                 self.status_update.emit("Tela de digimons aberta...")
                 if is_image_on_screen(IMAGE_PATHS['evp_terminado']):
@@ -113,7 +114,7 @@ class AutomationThread(QThread):
                 battle_start_image_HP_Try = 3
                 while not is_image_on_screen(IMAGE_PATHS['battle_start_hp']) and self.is_running and not self.is_paused:
                     if is_image_on_screen(IMAGE_PATHS['captcha_exists']):
-                        dividir_e_desenhar_contornos()
+                        dividir_e_desenhar_contornos(velocidade)
                     if battle_start_image_HP_Try == 0:
                         self.status_update.emit("Imagem de inicio de batalha não encontrada.")
                         if not is_image_on_screen(IMAGE_PATHS['janela_digimon']):
@@ -137,12 +138,12 @@ class AutomationThread(QThread):
                         break
                     
                     if is_image_on_screen(IMAGE_PATHS['captcha_exists']):
-                        dividir_e_desenhar_contornos()
+                        dividir_e_desenhar_contornos(velocidade)
                         
                     initiate_battle(IMAGE_PATHS['battle_detection'], self.main_window.battle_keys)
                     
                     if is_image_on_screen(IMAGE_PATHS['captcha_exists']):
-                        dividir_e_desenhar_contornos()
+                        dividir_e_desenhar_contornos(velocidade)
                         
                     battle_actions(IMAGE_PATHS['battle_detection'], IMAGE_PATHS['battle_finish'], self.main_window.battle_keys)
                     self.battles_count += 1
@@ -152,7 +153,7 @@ class AutomationThread(QThread):
                     self.battles_per_minute_update.emit(battles_per_minute)
                     
                     if is_image_on_screen(IMAGE_PATHS['captcha_exists']):
-                        dividir_e_desenhar_contornos()
+                        dividir_e_desenhar_contornos(velocidade)
                 else:
                     if not is_image_on_screen(IMAGE_PATHS['battle_start_evp']):
                         pyautogui.press('v')
@@ -160,7 +161,7 @@ class AutomationThread(QThread):
                             if not self.is_running or self.is_paused:
                                 break
                             if is_image_on_screen(IMAGE_PATHS['captcha_exists']):
-                                dividir_e_desenhar_contornos()
+                                dividir_e_desenhar_contornos(velocidade)
                             pyautogui.press('5')
                             time.sleep(0.5)                       
                         pyautogui.press('v')
@@ -277,21 +278,21 @@ class MainWindow(QMainWindow):
                 padding: 0 5px 0 5px;
             }
         """)
-        
+
         self.is_authenticated = False
-        self.current_user = None  # Added current_user attribute
+        self.current_user = None
         self.automation_thread = None
         self.app_state = APP_STATES['STOPPED']
-        self.license_expiration = None # Added license expiration attribute
-        
+        self.license_expiration = None
+
         self.battle_keys = {
             'group1': '',
             'group2': '',
             'group3': ''
         }
-        
+
         self.db = Database()
-        
+
         self.setup_ui()
         self.carregar_imagens()
 
@@ -300,14 +301,14 @@ class MainWindow(QMainWindow):
         self.setCentralWidget(self.central_widget)
         self.layout = QVBoxLayout(self.central_widget)
         self.layout.setContentsMargins(0, 0, 0, 0)
-        
+
         self.tabs = QTabWidget()
         self.layout.addWidget(self.tabs)
-        
+
         self.setup_auth_tab()
         self.setup_play_tab()
         self.setup_config_tab()
-        
+
         self.tabs.setTabEnabled(1, False)
         self.tabs.setTabEnabled(2, False)
 
@@ -616,6 +617,18 @@ class MainWindow(QMainWindow):
         capture_layout.addWidget(self.mensagem_info)
         self.setup_capture_cards(capture_layout)
         self.layout_configurar.addWidget(capture_group)
+
+    def setup_speed_mouse(self, layout):
+        mouse_speed_label = QLabel("Velocidade do Mouse:")
+        mouse_speed_label.setFixedWidth(150)
+        layout.addWidget(mouse_speed_label)
+
+        self.mouse_speed_combobox = QComboBox()
+        self.mouse_speed_combobox.addItems(["lento", "normal", "rapido"])
+        self.mouse_speed_combobox.setFixedWidth(120)
+        layout.addWidget(self.mouse_speed_combobox)
+
+        self.layout_configurar.addWidget(self.mouse_speed_combobox)
 
     def setup_resolution_config(self, layout):
         config_layout = QHBoxLayout()
