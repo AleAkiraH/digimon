@@ -30,8 +30,8 @@ class Database:
     def get_current_date_from_internet(self):
         # Lista de servidores de tempo para tentar
         time_servers = [
-            "http://worldclockapi.com/api/json/utc/nows",
-            "https://timeapi.io/api/time/current/zone?timeZone=America%2FSao_Paulos"
+            "http://worldclockapi.com/api/json/utc/nowx",
+            "https://timeapi.io/api/time/current/zone?timeZone=America%2FSao_Paulox"
         ]
         
         times = []

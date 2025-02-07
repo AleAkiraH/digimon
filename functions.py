@@ -45,9 +45,9 @@ def is_image_on_screen(image_path, confidence=0.85):
 def mover_mouse(x_inicial, y_inicial, x_final, y_final, velocidade='normal'):
     """Move mouse de um ponto a outro com diferentes velocidades"""
     num_etapas_dict = {
-        'lento': 100,
-        'normal': 50,
-        'rapido': 25
+        'lento': 60,
+        'normal': 30,
+        'rapido': 10
     }
     num_etapas = num_etapas_dict.get(velocidade, 50)
     x_step = (x_final - x_inicial) / num_etapas
@@ -68,6 +68,7 @@ def calcular_area_homogenea(quadrado):
 
 def dividir_e_desenhar_contornos(velocidade='normal'):    
     """Process captcha by dividing and drawing contours"""
+    print(velocidade)
     left = min(int(COORDINATES['x_inicial']), int(COORDINATES['x_final'])) 
     top = min(int(COORDINATES['y_inicial']), int(COORDINATES['y_final']))
     width = abs(int(COORDINATES['x_final']) - int(COORDINATES['x_inicial']))

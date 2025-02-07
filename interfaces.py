@@ -75,7 +75,9 @@ class AutomationThread(QThread):
             if self.is_paused:
                 time.sleep(0.1)
                 continue
+            
             velocidade = self.main_window.mouse_speed_combobox.currentText()
+            
             try:
                 if is_image_on_screen(IMAGE_PATHS['captcha_exists']):
                     
@@ -560,8 +562,8 @@ class MainWindow(QMainWindow):
                 background-color: #45a049;
             }
         """)
-        self.start_stop_button.clicked.connect(self.escolher_resolucao)
         self.start_stop_button.clicked.connect(self.toggle_automation)
+        self.start_stop_button.clicked.connect(self.escolher_resolucao)
         buttons_layout.addWidget(self.start_stop_button)
         
         content_layout.addWidget(buttons_container)
@@ -606,9 +608,11 @@ class MainWindow(QMainWindow):
         
         self.setup_resolution_config(general_layout)
         self.setup_digievolution_config(general_layout)
-        self.setup_battle_keys_config(general_layout)
         self.setup_speed_mouse(general_layout)  # Adiciona a configuração da velocidade do mouse
         self.layout_configurar.addWidget(general_group)
+
+        # Adiciona diretamente a configuração das teclas sem a group box
+        self.setup_battle_keys_config(self.layout_configurar)
 
         capture_group = QGroupBox("Captura de Imagens")
         capture_layout = QVBoxLayout()
@@ -618,16 +622,6 @@ class MainWindow(QMainWindow):
         capture_layout.addWidget(self.mensagem_info)
         self.setup_capture_cards(capture_layout)
         self.layout_configurar.addWidget(capture_group)
-
-    def setup_speed_mouse(self, layout):
-        mouse_speed_label = QLabel("Velocidade do Mouse:")
-        mouse_speed_label.setFixedWidth(150)
-        layout.addWidget(mouse_speed_label)
-
-        self.mouse_speed_combobox = QComboBox()
-        self.mouse_speed_combobox.addItems(["lento", "normal", "rapido"])
-        self.mouse_speed_combobox.setFixedWidth(120)
-        layout.addWidget(self.mouse_speed_combobox)
 
     def setup_resolution_config(self, layout):
         config_layout = QHBoxLayout()
@@ -658,11 +652,22 @@ class MainWindow(QMainWindow):
         self.digievolucao_combobox.currentIndexChanged.connect(self.atualizar_digievolucao)
         digievolucao_layout.addWidget(self.digievolucao_combobox)
         digievolucao_layout.addStretch()
+    
+    def setup_speed_mouse(self, layout):
+        mouse_speed_label = QLabel("Velocidade do Mouse:")
+        mouse_speed_label.setFixedWidth(150)
+        layout.addWidget(mouse_speed_label)
+
+        self.mouse_speed_combobox = QComboBox()
+        self.mouse_speed_combobox.addItems(["rapido", "normal", "lento"])
+        self.mouse_speed_combobox.setFixedWidth(120)
+
+        layout.addWidget(self.mouse_speed_combobox)
+
+        layout.addStretch()
 
     def setup_battle_keys_config(self, layout):
-        battle_keys_group = QGroupBox("Configuração de Teclas de Batalha")
         battle_keys_layout = QVBoxLayout()
-        battle_keys_group.setLayout(battle_keys_layout)
 
         # Define the key groups
         key_groups = [
@@ -693,7 +698,7 @@ class MainWindow(QMainWindow):
             group_layout.addLayout(button_group)
             battle_keys_layout.addLayout(group_layout)
 
-        layout.addWidget(battle_keys_group)
+        layout.addLayout(battle_keys_layout)
 
     def setup_capture_cards(self, layout):
         self.image_filenames = [
@@ -799,12 +804,10 @@ class MainWindow(QMainWindow):
         self.login_thread.start()
 
     def handle_login_result(self, success, error_message):
-        # Exibe o botão de login novamente
-        self.login_button.show()
-
         if success:
             self.login_progress.setValue(99)  # Preenche a barra de progresso
             self.login_status.setText("Login realizado com sucesso!")
+            self.login_button.show()
             self.is_authenticated = True
             self.current_user = self.username_input.text().lower()
             self.license_expiration = self.db.get_license_expiration(self.current_user)
@@ -828,19 +831,26 @@ class MainWindow(QMainWindow):
         super().closeEvent(event)
 
     def toggle_automation(self):
+        self.start_stop_button.hide()  # Esconde o botão imediatamente após o clique
+        QTimer.singleShot(100, self._toggle_automation)  # Aguarda um breve momento antes de iniciar a automação
+
+    def _toggle_automation(self):
         if self.app_state == APP_STATES['STOPPED']:
-            self.start_automation()            
+            self.start_automation()
         else:
             self.stop_automation()
+
+    def hide_start_stop_button(self):
+        self.start_stop_button.hide()
     
     def start_automation(self):
         if not self.is_authenticated:
             QMessageBox.warning(self, "Erro", "Por favor, autentique-se primeiro!")
+            self.start_stop_button.show()  # Mostra o botão novamente em caso de erro
             return
 
-        self.db.record_action(self.current_user, "inicio automacao")  # Updated line
+        self.db.record_action(self.current_user, "inicio automacao")
         self.app_state = APP_STATES['RUNNING']
-        # ... resto do método
         self.start_stop_button.setText("Parar Automação")
         self.start_stop_button.setStyleSheet("""
             QPushButton {
@@ -869,10 +879,10 @@ class MainWindow(QMainWindow):
             self.automation_thread.reset()
             self.automation_thread.resume()
 
-        # Reset the labels
         self.update_time("00:00:00")
         self.update_battles(0)
         self.update_battles_per_minute(0.00)
+        self.start_stop_button.show()
 
     def stop_automation(self):
         if self.automation_thread:
@@ -897,6 +907,7 @@ class MainWindow(QMainWindow):
                 background-color: #45a049;
             }
         """)
+        self.start_stop_button.show()  # Mostra o botão "Iniciar Automação"
         self.status_label.setText("Status: Parado")
         self.update_time("00:00:00")
         self.update_battles(0)
