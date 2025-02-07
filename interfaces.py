@@ -32,22 +32,25 @@ class LoginThread(QThread):
 
     def run(self):
         try:
-            # Emite 50% de progresso após a validação da versão
+            # Emite progresso de acordo com as etapas concluídas
+            self.progress.emit(10)  # 10% ao iniciar o processo de login
+
             version_valid, version_error = self.db.validate_version()
             if not version_valid:
                 self.finished.emit(False, version_error)
                 return
-            self.progress.emit(50)
+            self.progress.emit(30)  # 30% após validação da versão
 
-            # Emite 100% de progresso após a validação do usuário
             is_valid, error_message = self.db.validate_user(self.username, self.password)
             if not is_valid:
                 self.finished.emit(False, error_message if error_message else "Credenciais inválidas!")
                 return
-            self.progress.emit(100)
+            self.progress.emit(60)  # 60% após validação do usuário
 
             # Emite sucesso
+            self.progress.emit(90)  # 90% antes de finalizar com sucesso
             self.finished.emit(True, None)
+            self.progress.emit(99)  # 99% após login bem-sucedido
 
         except Exception as e:
             self.finished.emit(False, f"Erro ao conectar ao banco de dados: {str(e)}")
@@ -771,7 +774,7 @@ class MainWindow(QMainWindow):
         # Mostra a barra de progresso e o status label
         self.login_progress.show()
         self.login_status.show()
-        self.login_progress.setValue(0)  # Inicia a barra de progresso em 0
+        self.login_progress.setValue(10)  # Inicia a barra de progresso em 10%
         self.login_status.setText("Validando credenciais...")
 
         # Cria e inicia a thread de login
@@ -782,7 +785,7 @@ class MainWindow(QMainWindow):
 
     def handle_login_result(self, success, error_message):
         if success:
-            self.login_progress.setValue(100)  # Preenche a barra de progresso
+            self.login_progress.setValue(99)  # Preenche a barra de progresso
             self.login_status.setText("Login realizado com sucesso!")
             self.is_authenticated = True
             self.current_user = self.username_input.text().lower()
