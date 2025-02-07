@@ -14,7 +14,7 @@ class Database:
     
     def get_current_date_from_internet(self):
         time_servers = [
-            "http://worldclockapi.com/api/json/utc/now"
+            "https://timeapi.io/api/time/current/zone?timeZone=America%2FSao_Paulo"
         ]
         
         times = []
@@ -27,7 +27,7 @@ class Database:
                     
                     if server.endswith("Sao_Paulo"):
                         # WorldTimeAPI and TimeAPI.io already provide time in São Paulo timezone
-                        time = parser.parse(data['datetime'])
+                        time = parser.parse(data['dateTime'])
                     else:
                         # WorldClockAPI provides UTC time, so we need to convert it
                         utc_time = parser.parse(data['currentDateTime'])
@@ -35,6 +35,7 @@ class Database:
                         time = utc_time.replace(tzinfo=pytz.UTC).astimezone(sao_paulo_tz)
                     
                     times.append(time)
+                    break
             except Exception as e:
                 print(f"Error fetching time from {server}: {str(e)}")
         
