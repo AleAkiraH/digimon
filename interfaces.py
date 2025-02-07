@@ -245,6 +245,7 @@ class MainWindow(QMainWindow):
         self.current_user = None  # Added current_user attribute
         self.automation_thread = None
         self.app_state = APP_STATES['STOPPED']
+        self.license_expiration = None # Added license expiration attribute
         
         self.battle_keys = {
             'group1': '',
@@ -462,6 +463,16 @@ class MainWindow(QMainWindow):
         """)
         self.battles_per_minute_label.setAlignment(Qt.AlignCenter)
         content_layout.addWidget(self.battles_per_minute_label)
+
+        # License information label
+        self.license_info_label = QLabel("Informações da licença não disponíveis")
+        self.license_info_label.setStyleSheet("""
+            font-size: 14px;
+            color: #666;
+            margin: 10px 0;
+        """)
+        self.license_info_label.setAlignment(Qt.AlignCenter)
+        content_layout.addWidget(self.license_info_label)
 
         # Buttons container
         buttons_container = QWidget()
@@ -701,9 +712,11 @@ class MainWindow(QMainWindow):
             if is_valid:
                 self.is_authenticated = True
                 self.current_user = username  # Added line to set current_user
+                self.license_expiration = self.db.get_license_expiration(username) # Get license expiration date
                 self.tabs.setTabEnabled(1, True)
                 self.tabs.setTabEnabled(2, True)
                 self.tabs.setCurrentIndex(1)  # Muda para a aba "Jogar" após o login
+                self.update_license_info() # Call the new method to update license info
                 QMessageBox.information(self, "Sucesso", "Login realizado com sucesso!")
             
                 # Record the login
@@ -921,3 +934,11 @@ class MainWindow(QMainWindow):
         # Print current state of battle keys
         print("Current battle keys:", self.battle_keys)
 
+    def update_license_info(self):
+        if self.license_expiration:
+            days_left = (self.license_expiration - datetime.now().date()).days
+            expiration_text = f"Sua licença expira em {self.license_expiration.strftime('%d/%m/%Y')}"
+            days_left_text = f"Faltam {days_left} dias para sua licença expirar"
+            self.license_info_label.setText(f"{expiration_text}\n{days_left_text}")
+        else:
+            self.license_info_label.setText("Informações da licença não disponíveis")

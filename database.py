@@ -80,3 +80,14 @@ class Database:
     def close(self):
         self.client.close()
 
+    def get_license_expiration(self, username):
+        user = self.db.cadastrados.find_one({"usuario": username})
+        if not user:
+            return None
+        
+        key = user.get("chave")
+        key_info = self.db.chaves.find_one({"chave": key})
+        if not key_info:
+            return None
+        
+        return datetime.strptime(key_info["data_expiracao"], "%Y-%m-%d").date()
