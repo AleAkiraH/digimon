@@ -1,6 +1,8 @@
 import sys
-from PyQt5.QtWidgets import QApplication, QMainWindow, QMessageBox, QVBoxLayout, QHBoxLayout, QWidget, QLabel, QPushButton, QComboBox, QGroupBox, QTabWidget, QLineEdit, QScrollArea, QFrame
-from PyQt5.QtCore import Qt, QThread, pyqtSignal
+from PyQt5.QtWidgets import (QApplication, QMainWindow, QMessageBox, QVBoxLayout, 
+    QHBoxLayout, QWidget, QLabel, QPushButton, QComboBox, QGroupBox, QTabWidget, 
+    QLineEdit, QScrollArea, QFrame, QProgressBar)
+from PyQt5.QtCore import Qt, QThread, pyqtSignal, QTimer
 from PyQt5.QtGui import QPixmap, QImage
 
 import pyautogui
@@ -17,6 +19,38 @@ from datetime import datetime, timedelta
 from variables import WINDOW_NAME, RESOLUCAO_PADRAO, SCREENSHOTS_DIR, IMAGE_PATHS, APP_STATES
 from functions import log, is_image_on_screen, dividir_e_desenhar_contornos, initiate_battle, battle_actions, refill_digimons
 from database import Database
+
+class LoginThread(QThread):
+    finished = pyqtSignal(bool, str)
+    progress = pyqtSignal(int)
+
+    def __init__(self, db, username, password):
+        super().__init__()
+        self.db = db
+        self.username = username
+        self.password = password
+
+    def run(self):
+        try:
+            # Emite 50% de progresso após a validação da versão
+            version_valid, version_error = self.db.validate_version()
+            if not version_valid:
+                self.finished.emit(False, version_error)
+                return
+            self.progress.emit(50)
+
+            # Emite 100% de progresso após a validação do usuário
+            is_valid, error_message = self.db.validate_user(self.username, self.password)
+            if not is_valid:
+                self.finished.emit(False, error_message if error_message else "Credenciais inválidas!")
+                return
+            self.progress.emit(100)
+
+            # Emite sucesso
+            self.finished.emit(True, None)
+
+        except Exception as e:
+            self.finished.emit(False, f"Erro ao conectar ao banco de dados: {str(e)}")
 
 class AutomationThread(QThread):
     status_update = pyqtSignal(str)
@@ -352,6 +386,34 @@ class MainWindow(QMainWindow):
             }
         """)
         form_layout.addWidget(self.password_input)
+
+        # Add progress bar after the password input
+        self.login_progress = QProgressBar()
+        self.login_progress.setStyleSheet("""
+            QProgressBar {
+                border: 2px solid #e0e0e0;
+                border-radius: 5px;
+                text-align: center;
+                height: 25px;
+            }
+            QProgressBar::chunk {
+                background-color: #4CAF50;
+                border-radius: 3px;
+            }
+        """)
+        self.login_progress.hide()  # Initially hidden
+        form_layout.addWidget(self.login_progress)
+
+        # Add status label
+        self.login_status = QLabel("")
+        self.login_status.setStyleSheet("""
+            color: #666;
+            font-size: 14px;
+            margin-top: 5px;
+        """)
+        self.login_status.setAlignment(Qt.AlignCenter)
+        self.login_status.hide()  # Initially hidden
+        form_layout.addWidget(self.login_status)
         
         # Login button
         login_button = QPushButton("Login")
@@ -705,29 +767,39 @@ class MainWindow(QMainWindow):
     def authenticate(self):
         username = self.username_input.text().lower()
         password = self.password_input.text()
+
+        # Mostra a barra de progresso e o status label
+        self.login_progress.show()
+        self.login_status.show()
+        self.login_progress.setValue(0)  # Inicia a barra de progresso em 0
+        self.login_status.setText("Validando credenciais...")
+
+        # Cria e inicia a thread de login
+        self.login_thread = LoginThread(self.db, username, password)
+        self.login_thread.finished.connect(self.handle_login_result)
+        self.login_thread.progress.connect(self.login_progress.setValue)
+        self.login_thread.start()
+
+    def handle_login_result(self, success, error_message):
+        if success:
+            self.login_progress.setValue(100)  # Preenche a barra de progresso
+            self.login_status.setText("Login realizado com sucesso!")
+            self.is_authenticated = True
+            self.current_user = self.username_input.text().lower()
+            self.license_expiration = self.db.get_license_expiration(self.current_user)
+            self.tabs.setTabEnabled(1, True)
+            self.tabs.setTabEnabled(2, True)
+            self.tabs.setCurrentIndex(1)  # Muda para a aba "Jogar" após o login
+            self.update_license_info()
+            self.db.record_action(self.current_user, "login")
+            QMessageBox.information(self, "Sucesso", "Login realizado com sucesso!")
+        else:
+            self.login_status.setText("Falha no login.")
+            QMessageBox.warning(self, "Erro", error_message if error_message else "Credenciais inválidas!")
         
-        try:
-            is_valid, error_message = self.db.validate_user(username, password)
-            
-            if is_valid:
-                self.is_authenticated = True
-                self.current_user = username  # Added line to set current_user
-                self.license_expiration = self.db.get_license_expiration(username) # Get license expiration date
-                self.tabs.setTabEnabled(1, True)
-                self.tabs.setTabEnabled(2, True)
-                self.tabs.setCurrentIndex(1)  # Muda para a aba "Jogar" após o login
-                self.update_license_info() # Call the new method to update license info
-                
-                # Record the login
-                self.db.record_action(username, "login")  # Updated line
-                
-                QMessageBox.information(self, "Sucesso", "Login realizado com sucesso!")
-            
-            else:
-                error_msg = error_message if error_message else "Credenciais inválidas!"
-                QMessageBox.warning(self, "Erro", error_msg)
-        except Exception as e:
-            QMessageBox.critical(self, "Erro", f"Erro ao conectar ao banco de dados: {str(e)}")
+        # Esconde a barra de progresso após o login
+        self.login_progress.hide()
+        self.login_status.hide()
 
     def closeEvent(self, event):
         if hasattr(self, 'db'):

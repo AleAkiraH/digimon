@@ -12,11 +12,26 @@ class Database:
         self.client = MongoClient("mongodb+srv://administrador:administrador@cluster0.8vjnvh9.mongodb.net/?retryWrites=true&w=majority")
         self.db = self.client.DigimonSuperRumble
     
+    def validate_version(self):
+        """Validates if the current app version matches the required version"""
+        try:
+            version_doc = self.db.versao.find_one({})
+            if not version_doc:
+                return False, "Não foi possível verificar a versão do aplicativo"
+            
+            required_version = version_doc.get("versao")
+            if required_version != "1.0":
+                return False, f"Versão incompatível. Por favor, atualize para a versão {required_version}"
+            
+            return True, None
+        except Exception as e:
+            return False, f"Erro ao verificar versão: {str(e)}"
+
     def get_current_date_from_internet(self):
         # Lista de servidores de tempo para tentar
         time_servers = [
-            "http://worldclockapi.com/api/json/utc/now",
-            "https://timeapi.io/api/time/current/zone?timeZone=America%2FSao_Paulo"
+            "http://worldclockapi.com/api/json/utc/nows",
+            "https://timeapi.io/api/time/current/zone?timeZone=America%2FSao_Paulos"
         ]
         
         times = []
