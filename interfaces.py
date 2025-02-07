@@ -717,10 +717,12 @@ class MainWindow(QMainWindow):
                 self.tabs.setTabEnabled(2, True)
                 self.tabs.setCurrentIndex(1)  # Muda para a aba "Jogar" após o login
                 self.update_license_info() # Call the new method to update license info
-                QMessageBox.information(self, "Sucesso", "Login realizado com sucesso!")
-            
+                
                 # Record the login
                 self.db.record_action(username, "login")  # Updated line
+                
+                QMessageBox.information(self, "Sucesso", "Login realizado com sucesso!")
+            
             else:
                 error_msg = error_message if error_message else "Credenciais inválidas!"
                 QMessageBox.warning(self, "Erro", error_msg)
