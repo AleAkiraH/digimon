@@ -144,10 +144,6 @@ class AutomationThread(QThread):
                     self.status_update.emit("Imagem de início de batalha detectada.")                
                     pyautogui.press('i')
                     
-                    if keyboard.is_pressed('r'):
-                        self.status_update.emit(f"Bot encerrado. Tempo de execução: {elapsed_time_str}")
-                        break
-                    
                     if is_image_on_screen(IMAGE_PATHS['captcha_exists']):
                         dividir_e_desenhar_contornos()
                         
