@@ -143,7 +143,7 @@ class AutomationThread(QThread):
                 if all(is_image_on_screen(IMAGE_PATHS[img]) for img in ['battle_start_hp', 'battle_start_sp', 'battle_start_evp']):
                     self.status_update.emit("Imagem de início de batalha detectada.")                
                     pyautogui.press('i')
-                    
+                    self.status_update.emit("Procurando batalha: pressionando 'F'.")                
                     if is_image_on_screen(IMAGE_PATHS['captcha_exists']):
                         dividir_e_desenhar_contornos()
                         
