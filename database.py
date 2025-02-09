@@ -1,8 +1,6 @@
 from pymongo import MongoClient
 from datetime import datetime
 import requests
-from datetime import datetime
-import requests
 from dateutil import parser
 from statistics import median
 import pytz
@@ -110,7 +108,8 @@ class Database:
         if current_date.date() > expiration_date:
             return False, "Chave expirada"
         
-        return True, None 
+        return True, None
+    
     def record_action(self, username, acao):
         current_time = self.get_current_date_from_internet()
         if current_time is None:
@@ -125,6 +124,7 @@ class Database:
         
     def close(self):
         self.client.close()
+    
     def get_license_expiration(self, username):
         user = self.db.cadastrados.find_one({"usuario": username})
         if not user:
@@ -136,3 +136,14 @@ class Database:
             return None
         
         return datetime.strptime(key_info["data_expiracao"], "%Y-%m-%d").date()
+    
+    def get_monitoring_status(self):
+        """Fetch the monitoring status from the database"""
+        try:
+            monitor_doc = self.db.monitoramento.find_one({"_id": "67a9227d15c87405944dfad2"})
+            if monitor_doc:
+                return monitor_doc.get("ativado", False)
+            return False
+        except Exception as e:
+            print(f"Erro ao buscar status de monitoramento: {str(e)}")
+            return False

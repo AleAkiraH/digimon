@@ -10,10 +10,11 @@ import io
 from variables import COORDINATES, IMAGE_PATHS, DIGIVOLUCAO, WINDOW_NAME
 from telegram.ext import Updater
 from telegram import Bot
-from datetime import datetime
+from datetime import datetime, timedelta
 import os
 import getpass
 import pygetwindow as gw
+import database as Database
 
 # Initialize logging
 last_log_message = None
@@ -22,6 +23,11 @@ last_log_message = None
 BOT_TOKEN = "7787489780:AAHsHx__UcKkfpAkXUPDES2TahBtUFzJSx8"
 CHAT_ID = "975349421"
 last_screenshot_time = datetime.now()
+
+# Timestamp for last monitoring check
+last_monitoring_check = datetime.min
+monitoring_status = False
+monitoramento_enviado = False
 
 def send_screenshot_telegram(bot_token=BOT_TOKEN, chat_id=CHAT_ID, message="Aqui está a screenshot"):
     """Send screenshot to Telegram"""
@@ -180,7 +186,25 @@ def battle_actions(battle_detection_image, battle_finish_image, battle_keys):
         log("Aguardando para iniciar uma nova batalha.")
 
 def initiate_battle(battle_detection_image, battle_keys):
-   
+    global last_monitoring_check, monitoring_status, monitoramento_enviado
+
+    current_time = datetime.now()
+    if ((current_time - last_monitoring_check) > timedelta(minutes=5)) and monitoramento_enviado == False:
+        try:
+            # Verifica o status de monitoramento da base de dados
+            db = Database()
+            monitoring_status = db.get_monitoring_status()
+            db.close()
+            last_monitoring_check = current_time
+            monitoramento_enviado = True
+
+            if monitoring_status:
+                send_screenshot_telegram(message="Início da batalha validado!")
+        except:
+            pass
+
+    
+
     while is_image_on_screen(IMAGE_PATHS['battle_finish']):
         pyautogui.press('v')
         log("Procurando batalha: pressionando 'F'.")        
