@@ -25,11 +25,31 @@ class ConfigPage(QWidget):
         main_layout = QVBoxLayout(self)
         main_layout.addWidget(scroll_area)
         
+        # Adiciona os botões de ação no topo
+        self._setup_action_buttons()
         self._setup_title()
         self._setup_general_config()
         self._setup_telegram_config()
         self._setup_battle_keys_config()
-        self._setup_save_button()
+        
+    def _setup_action_buttons(self):
+        buttons_container = QWidget()
+        buttons_layout = QHBoxLayout(buttons_container)
+        buttons_layout.setAlignment(Qt.AlignRight)
+        
+        # Botão Carregar
+        load_button = QPushButton("Carregar Configurações")
+        load_button.setStyleSheet(self._get_button_style("#1E90FF"))
+        load_button.clicked.connect(self._load_config)
+        buttons_layout.addWidget(load_button)
+        
+        # Botão Salvar
+        save_button = QPushButton("Salvar Configurações")
+        save_button.setStyleSheet(self._get_button_style("#4CAF50"))
+        save_button.clicked.connect(self._save_config)
+        buttons_layout.addWidget(save_button)
+        
+        self.layout_configurar.addWidget(buttons_container)
         
     def _setup_title(self):
         title_label = QLabel("Configurações")
@@ -127,9 +147,9 @@ class ConfigPage(QWidget):
             ('group3', ['Z', 'X', 'C'])
         ]
         
-        for group_name, keys in key_groups:
+        for i, (group_name, keys) in enumerate(key_groups, 1):
             group_layout = QHBoxLayout()
-            label = QLabel(f"Grupo {group_name[-1]}:")
+            label = QLabel(f"Tecla {i}:")  # Alterado de "Grupo" para "Tecla"
             label.setFixedWidth(100)
             group_layout.addWidget(label)
             
@@ -147,26 +167,6 @@ class ConfigPage(QWidget):
         
         battle_keys_group.setLayout(battle_keys_layout)
         self.layout_configurar.addWidget(battle_keys_group)
-    
-    def _setup_save_button(self):
-        save_button = QPushButton("Salvar Configurações")
-        save_button.setStyleSheet("""
-            QPushButton {
-                background-color: #4CAF50;
-                color: white;
-                border: none;
-                border-radius: 5px;
-                padding: 12px;
-                font-size: 16px;
-                font-weight: bold;
-                margin-top: 20px;
-            }
-            QPushButton:hover {
-                background-color: #45a049;
-            }
-        """)
-        save_button.clicked.connect(self._save_config)
-        self.layout_configurar.addWidget(save_button)
     
     def _update_battle_key(self, key: str, group: str):
         button = self.sender()
@@ -191,9 +191,25 @@ class ConfigPage(QWidget):
         self.config.digivolution_type = self.digievolucao_combobox.currentText()
         
         self.config.save()
-        
-        # Atualiza as configurações no sistema
         self.main_window.update_config(self.config)
+    
+    def _load_config(self):
+        self.config = Config.load()
+        
+        # Atualiza a interface com as configurações carregadas
+        self.resolucao_combobox.setCurrentText(self.config.resolution)
+        self.interval_spinbox.setValue(self.config.telegram_interval)
+        self.token_input.setText(self.config.bot_token)
+        self.chat_input.setText(self.config.chat_id)
+        self.digievolucao_combobox.setCurrentText(self.config.digivolution_type)
+        
+        # Atualiza os botões de teclas
+        for button in self.findChildren(KeyButton):
+            group = button.property('group')
+            if group and self.config.battle_keys[group] == button.text():
+                button.setChecked(True)
+            else:
+                button.setChecked(False)
     
     def _get_group_style(self):
         return """
@@ -203,4 +219,21 @@ class ConfigPage(QWidget):
                 padding: 20px;
                 color: #4682B4;
             }
+        """
+    
+    def _get_button_style(self, background_color):
+        return f"""
+            QPushButton {{
+                background-color: {background_color};
+                color: white;
+                border: none;
+                border-radius: 5px;
+                padding: 8px 16px;
+                font-size: 14px;
+                font-weight: bold;
+                margin: 5px;
+            }}
+            QPushButton:hover {{
+                background-color: {background_color}dd;
+            }}
         """
