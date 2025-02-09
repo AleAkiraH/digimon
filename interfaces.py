@@ -636,10 +636,29 @@ class MainWindow(QMainWindow):
         config_layout.addWidget(label_resolucao)
 
         self.resolucao_combobox = QComboBox()
-        self.resolucao_combobox.addItems(["800x600", "1024x768"])
+        self.resolucao_combobox.addItems(["800x600"])
         self.resolucao_combobox.setFixedWidth(120)
-        self.resolucao_combobox.currentIndexChanged.connect(self.escolher_resolucao)
+
+        # Adiciona o botão de atualizar ao lado do combobox
+        self.update_resolution_button = QPushButton("Atualizar")
+        self.update_resolution_button.setFixedWidth(100)
+        self.update_resolution_button.setStyleSheet("""
+            QPushButton {
+                background-color: #4682B4;
+                color: white;
+                border: none;
+                padding: 10px;
+                border-radius: 5px;
+                font-size: 14px;
+            }
+            QPushButton:hover {
+                background-color: #1E90FF;
+            }
+        """)
+        self.update_resolution_button.setCursor(Qt.PointingHandCursor)
+        self.update_resolution_button.clicked.connect(self.escolher_resolucao)
         config_layout.addWidget(self.resolucao_combobox)
+        config_layout.addWidget(self.update_resolution_button)
         config_layout.addStretch()
 
     def setup_digievolution_config(self, layout):

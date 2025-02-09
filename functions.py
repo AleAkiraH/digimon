@@ -56,13 +56,6 @@ def send_screenshot_telegram(bot_token=BOT_TOKEN, chat_id=CHAT_ID, message="Aqui
     except Exception as e:
         log(f"Error sending screenshot to Telegram: {str(e)}")
 
-def should_send_screenshot():
-    """Check if 15 minutes have passed since last screenshot"""
-    global last_screenshot_time
-    current_time = datetime.now()
-    time_diff = (current_time - last_screenshot_time).total_seconds()
-    return time_diff >= 900  # 900 seconds = 15 minutes
-
 def log(message, log_file="script_logs.txt"):
     """Log messages to file and console"""
     global last_log_message
@@ -187,18 +180,11 @@ def battle_actions(battle_detection_image, battle_finish_image, battle_keys):
         log("Aguardando para iniciar uma nova batalha.")
 
 def initiate_battle(battle_detection_image, battle_keys):
-    """Initiate battle sequence"""
-    global last_screenshot_time
-    
+   
     while is_image_on_screen(IMAGE_PATHS['battle_finish']):
         pyautogui.press('v')
-        log("Procurando batalha: pressionando 'F'.")
-        
-        # Check if it's time to send a screenshot
-        if should_send_screenshot():
-            send_screenshot_telegram(message="Status da batalha a cada 15 minutos")
-            last_screenshot_time = datetime.now()
-        
+        log("Procurando batalha: pressionando 'F'.")        
+       
         for _ in range(20):
             if is_image_on_screen(battle_detection_image):
                 break
