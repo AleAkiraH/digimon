@@ -29,6 +29,9 @@ last_monitoring_check = datetime.min
 monitoring_status = False
 monitoramento_enviado = False
 
+# Timestamp for the last historical record
+last_historical_record = datetime.min
+
 def send_screenshot_telegram(bot_token=BOT_TOKEN, chat_id=CHAT_ID, message="Aqui está a screenshot"):
     """Send screenshot to Telegram"""
     try:
@@ -185,8 +188,15 @@ def battle_actions(battle_detection_image, battle_finish_image, battle_keys):
     while not is_image_on_screen(battle_finish_image):
         log("Aguardando para iniciar uma nova batalha.")
 
+def record_historical_action(username, action):
+    """Record an action in the historical collection"""
+    db = Database()
+    db.historico(username, action)
+    db.close()
+    log(f"Ação '{action}' registrada para o usuário {username}.")
+
 def initiate_battle(battle_detection_image, battle_keys):
-    global last_monitoring_check, monitoring_status, monitoramento_enviado
+    global last_monitoring_check, monitoring_status, monitoramento_enviado, last_historical_record
 
     current_time = datetime.now()
     if ((current_time - last_monitoring_check) > timedelta(minutes=5)) and monitoramento_enviado == False:
@@ -203,7 +213,10 @@ def initiate_battle(battle_detection_image, battle_keys):
         except:
             pass
 
-    
+    # Record historical action every 30 minutes
+    if current_time - last_historical_record >= timedelta(minutes=30):
+        record_historical_action("username", "executando")
+        last_historical_record = current_time
 
     while is_image_on_screen(IMAGE_PATHS['battle_finish']):
         pyautogui.press('v')
