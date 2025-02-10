@@ -14,7 +14,7 @@ from datetime import datetime, timedelta
 import os
 import getpass
 import pygetwindow as gw
-import database as Database
+from database import Database  # Certifique-se de importar a classe Database corretamente
 
 # Initialize logging
 last_log_message = None
@@ -191,7 +191,7 @@ def battle_actions(battle_detection_image, battle_finish_image, battle_keys):
 def record_historical_action(username, action):
     """Record an action in the historical collection"""
     db = Database()
-    db.historico(username, action)
+    db.record_action(username, action)
     db.close()
     log(f"Ação '{action}' registrada para o usuário {username}.")
 
@@ -199,6 +199,7 @@ def initiate_battle(battle_detection_image, battle_keys):
     global last_monitoring_check, monitoring_status, monitoramento_enviado, last_historical_record
 
     current_time = datetime.now()
+    log(f"Monitoramento status:{monitoramento_enviado}")
     if ((current_time - last_monitoring_check) > timedelta(minutes=5)) and monitoramento_enviado == False:
         try:
             # Verifica o status de monitoramento da base de dados
@@ -207,11 +208,11 @@ def initiate_battle(battle_detection_image, battle_keys):
             db.close()
             last_monitoring_check = current_time
             monitoramento_enviado = True
-
+            
             if monitoring_status:
                 send_screenshot_telegram(message="Início da batalha validado!")
-        except:
-            pass
+        except Exception as ex:
+            log(f"{ex}")
 
     # Record historical action every 30 minutes
     if current_time - last_historical_record >= timedelta(minutes=30):
