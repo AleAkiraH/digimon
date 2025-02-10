@@ -637,7 +637,7 @@ class MainWindow(QMainWindow):
         config_layout.addWidget(label_resolucao)
 
         self.resolucao_combobox = QComboBox()
-        self.resolucao_combobox.addItems(["800x600"])
+        self.resolucao_combobox.addItems(["800x600", "1366x768"])  # Add the new resolution option here
         self.resolucao_combobox.setFixedWidth(120)
 
         # Adiciona o botão de atualizar ao lado do combobox
@@ -994,6 +994,12 @@ class MainWindow(QMainWindow):
 
     def escolher_resolucao(self):
         resolucao_selecionada = self.resolucao_combobox.currentText()
+
+        # Check if the selected resolution is 1366x768
+        if resolucao_selecionada == "1366x768":
+            QMessageBox.warning(self, "Aviso", "No momento a automação não é capaz de rodar nessa resolução.")
+            return
+
         largura, altura = map(int, resolucao_selecionada.split("x"))
         
         hwnd = win32gui.FindWindow(None, 'Digimon SuperRumble  ')
