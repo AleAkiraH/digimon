@@ -10,10 +10,11 @@ import io
 from variables import COORDINATES, IMAGE_PATHS, DIGIVOLUCAO, WINDOW_NAME
 from telegram.ext import Updater
 from telegram import Bot
-from datetime import datetime
+from datetime import datetime, timedelta
 import os
 import getpass
 import pygetwindow as gw
+from database import Database  # Certifique-se de importar a classe Database corretamente
 
 # Initialize logging
 last_log_message = None
@@ -21,7 +22,6 @@ last_log_message = None
 # Telegram configuration
 BOT_TOKEN = "7787489780:AAHsHx__UcKkfpAkXUPDES2TahBtUFzJSx8"
 CHAT_ID = "975349421"
-last_screenshot_time = datetime.now()
 
 def send_screenshot_telegram(bot_token=BOT_TOKEN, chat_id=CHAT_ID, message="Aqui está a screenshot"):
     """Send screenshot to Telegram"""
@@ -50,18 +50,10 @@ def send_screenshot_telegram(bot_token=BOT_TOKEN, chat_id=CHAT_ID, message="Aqui
                 bot.send_photo(chat_id=chat_id, photo=photo, caption=message)
 
             os.remove(screenshot_path)
-            log("Screenshot sent to Telegram successfully")
         else:
-            log("Window was not activated for screenshot")
+            log("Window was not activated")
     except Exception as e:
         log(f"Error sending screenshot to Telegram: {str(e)}")
-
-def should_send_screenshot():
-    """Check if 15 minutes have passed since last screenshot"""
-    global last_screenshot_time
-    current_time = datetime.now()
-    time_diff = (current_time - last_screenshot_time).total_seconds()
-    return time_diff >= 900  # 900 seconds = 15 minutes
 
 def log(message, log_file="script_logs.txt"):
     """Log messages to file and console"""
@@ -112,9 +104,8 @@ def calcular_area_homogenea(quadrado):
     unique_pixels, counts = np.unique(pixels, axis=0, return_counts=True)
     return max(counts)
 
-def dividir_e_desenhar_contornos(velocidade='normal'):    
+def dividir_e_desenhar_contornos(username):    
     """Process captcha by dividing and drawing contours"""
-    print(velocidade)
     left = min(int(COORDINATES['x_inicial']), int(COORDINATES['x_final'])) 
     top = min(int(COORDINATES['y_inicial']), int(COORDINATES['y_final']))
     width = abs(int(COORDINATES['x_final']) - int(COORDINATES['x_inicial']))
@@ -126,7 +117,7 @@ def dividir_e_desenhar_contornos(velocidade='normal'):
     cv2.imwrite("CaptchaSolution\\screenshot.png", image)
 
     # Send screenshot to Telegram when captcha is detected
-    send_screenshot_telegram(message="Captcha detectado!")
+    send_screenshot_telegram(message=f"{username}: Captcha detectado!")
 
     altura, largura, _ = image.shape
     tamanho_quadrado_largura = largura // 8
@@ -186,19 +177,18 @@ def battle_actions(battle_detection_image, battle_finish_image, battle_keys):
     while not is_image_on_screen(battle_finish_image):
         log("Aguardando para iniciar uma nova batalha.")
 
-def initiate_battle(battle_detection_image, battle_keys):
-    """Initiate battle sequence"""
-    global last_screenshot_time
-    
+def record_historical_action(username, action):
+    """Record an action in the historical collection"""
+    db = Database()
+    db.record_action(username, action)
+    db.close()
+    log(f"Ação '{action}' registrada para o usuário {username}.")
+
+def initiate_battle(battle_detection_image, battle_keys):    
     while is_image_on_screen(IMAGE_PATHS['battle_finish']):
         pyautogui.press('v')
-        log("Procurando batalha: pressionando 'F'.")
-        
-        # Check if it's time to send a screenshot
-        if should_send_screenshot():
-            send_screenshot_telegram(message="Status da batalha a cada 15 minutos")
-            last_screenshot_time = datetime.now()
-        
+        log("Procurando batalha: pressionando 'F'.")        
+       
         for _ in range(20):
             if is_image_on_screen(battle_detection_image):
                 break
