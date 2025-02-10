@@ -1,3 +1,4 @@
+import secure_config
 import sys
 from PyQt5.QtWidgets import QApplication
 from interfaces import MainWindow

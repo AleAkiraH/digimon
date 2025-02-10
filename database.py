@@ -1,3 +1,4 @@
+from secure_config import SECURE_CONFIG
 from pymongo import MongoClient
 from datetime import datetime
 import requests
@@ -8,7 +9,7 @@ from bson import ObjectId
 
 class Database:
     def __init__(self):
-        self.client = MongoClient("mongodb+srv://administrador:administrador@cluster0.8vjnvh9.mongodb.net/?retryWrites=true&w=majority")
+        self.client = MongoClient(SECURE_CONFIG['MONGO_URI'])
         self.db = self.client.DigimonSuperRumble
     
     def validate_version(self):

@@ -8,6 +8,7 @@ import win32con
 from PIL import ImageGrab
 import io
 from variables import COORDINATES, IMAGE_PATHS, DIGIVOLUCAO, WINDOW_NAME
+from secure_config import SECURE_CONFIG
 from telegram.ext import Updater
 from telegram import Bot
 from datetime import datetime, timedelta
@@ -20,8 +21,8 @@ from database import Database  # Certifique-se de importar a classe Database cor
 last_log_message = None
 
 # Telegram configuration
-BOT_TOKEN = "7787489780:AAHsHx__UcKkfpAkXUPDES2TahBtUFzJSx8"
-CHAT_ID = "975349421"
+BOT_TOKEN = SECURE_CONFIG['BOT_TOKEN']
+CHAT_ID = SECURE_CONFIG['CHAT_ID']
 
 def send_screenshot_telegram(bot_token=BOT_TOKEN, chat_id=CHAT_ID, message="Aqui está a screenshot"):
     """Send screenshot to Telegram"""
