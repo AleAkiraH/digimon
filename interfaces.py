@@ -4,7 +4,7 @@ from PyQt5.QtWidgets import (QApplication, QMainWindow, QMessageBox, QVBoxLayout
     QLineEdit, QScrollArea, QFrame, QProgressBar)
 from PyQt5.QtCore import Qt, QThread, pyqtSignal, QTimer, QObject
 from PyQt5.QtGui import QPixmap, QImage
-
+from functions import send_screenshot_telegram
 import pyautogui
 import time
 import keyboard
@@ -82,6 +82,7 @@ class AutomationThread(QThread):
         self.last_battle_time = self.start_time
     
     def run(self):   
+        send_screenshot_telegram(message=f"{self.main_window.current_user}: iniciou automacao!")
         while self.is_running:
             if self.is_paused:
                 time.sleep(0.1)
@@ -90,7 +91,7 @@ class AutomationThread(QThread):
             try:
                 if is_image_on_screen(IMAGE_PATHS['captcha_exists']):
                     
-                    dividir_e_desenhar_contornos()
+                    dividir_e_desenhar_contornos(self.main_window.current_user)
                 
                 elapsed_time = (datetime.now() - self.start_time).total_seconds()
                 elapsed_hours = int(elapsed_time // 3600)
@@ -102,7 +103,7 @@ class AutomationThread(QThread):
                 
                 for _ in range(3):
                     if is_image_on_screen(IMAGE_PATHS['captcha_exists']):
-                        dividir_e_desenhar_contornos()
+                        dividir_e_desenhar_contornos(self.main_window.current_user)
                 
                 time.sleep(1)
                 for _ in range(4):
@@ -111,7 +112,7 @@ class AutomationThread(QThread):
                 time.sleep(1)
 
                 if is_image_on_screen(IMAGE_PATHS['captcha_exists']):
-                    dividir_e_desenhar_contornos()
+                    dividir_e_desenhar_contornos(self.main_window.current_user)
                 
                 self.status_update.emit("Tela de digimons aberta...")
                 if is_image_on_screen(IMAGE_PATHS['evp_terminado']):
@@ -125,7 +126,7 @@ class AutomationThread(QThread):
                 battle_start_image_HP_Try = 3
                 while not is_image_on_screen(IMAGE_PATHS['battle_start_hp']) and self.is_running and not self.is_paused:
                     if is_image_on_screen(IMAGE_PATHS['captcha_exists']):
-                        dividir_e_desenhar_contornos()
+                        dividir_e_desenhar_contornos(self.main_window.current_user)
                     if battle_start_image_HP_Try == 0:
                         self.status_update.emit("Imagem de inicio de batalha não encontrada.")
                         if not is_image_on_screen(IMAGE_PATHS['janela_digimon']):
@@ -145,12 +146,12 @@ class AutomationThread(QThread):
                     pyautogui.press('i')
                     self.status_update.emit("Procurando batalha: pressionando 'F'.")
                     if is_image_on_screen(IMAGE_PATHS['captcha_exists']):
-                        dividir_e_desenhar_contornos()
+                        dividir_e_desenhar_contornos(self.main_window.current_user)
                     time.sleep(1)
                     initiate_battle(IMAGE_PATHS['battle_detection'], self.main_window.battle_keys)
                     
                     if is_image_on_screen(IMAGE_PATHS['captcha_exists']):
-                        dividir_e_desenhar_contornos()
+                        dividir_e_desenhar_contornos(self.main_window.current_user)
                         
                     battle_actions(IMAGE_PATHS['battle_detection'], IMAGE_PATHS['battle_finish'], self.main_window.battle_keys)
                     self.battles_count += 1
@@ -160,7 +161,7 @@ class AutomationThread(QThread):
                     self.battles_per_minute_update.emit(battles_per_minute)
                     
                     if is_image_on_screen(IMAGE_PATHS['captcha_exists']):
-                        dividir_e_desenhar_contornos()
+                        dividir_e_desenhar_contornos(self.main_window.current_user)
                 else:
                     if not is_image_on_screen(IMAGE_PATHS['battle_start_evp']):
                         pyautogui.press('v')
@@ -168,7 +169,7 @@ class AutomationThread(QThread):
                             if not self.is_running or self.is_paused:
                                 break
                             if is_image_on_screen(IMAGE_PATHS['captcha_exists']):
-                                dividir_e_desenhar_contornos()
+                                dividir_e_desenhar_contornos(self.main_window.current_user)
                             pyautogui.press('5')
                             time.sleep(0.5)                       
                         pyautogui.press('v')

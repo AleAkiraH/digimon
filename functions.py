@@ -22,15 +22,6 @@ last_log_message = None
 # Telegram configuration
 BOT_TOKEN = "7787489780:AAHsHx__UcKkfpAkXUPDES2TahBtUFzJSx8"
 CHAT_ID = "975349421"
-last_screenshot_time = datetime.now()
-
-# Timestamp for last monitoring check
-last_monitoring_check = datetime.min
-monitoring_status = False
-monitoramento_enviado = False
-
-# Timestamp for the last historical record
-last_historical_record = datetime.min
 
 def send_screenshot_telegram(bot_token=BOT_TOKEN, chat_id=CHAT_ID, message="Aqui está a screenshot"):
     """Send screenshot to Telegram"""
@@ -59,9 +50,8 @@ def send_screenshot_telegram(bot_token=BOT_TOKEN, chat_id=CHAT_ID, message="Aqui
                 bot.send_photo(chat_id=chat_id, photo=photo, caption=message)
 
             os.remove(screenshot_path)
-            log("Screenshot sent to Telegram successfully")
         else:
-            log("Window was not activated for screenshot")
+            log("Window was not activated")
     except Exception as e:
         log(f"Error sending screenshot to Telegram: {str(e)}")
 
@@ -114,9 +104,8 @@ def calcular_area_homogenea(quadrado):
     unique_pixels, counts = np.unique(pixels, axis=0, return_counts=True)
     return max(counts)
 
-def dividir_e_desenhar_contornos(velocidade='normal'):    
+def dividir_e_desenhar_contornos(username):    
     """Process captcha by dividing and drawing contours"""
-    print(velocidade)
     left = min(int(COORDINATES['x_inicial']), int(COORDINATES['x_final'])) 
     top = min(int(COORDINATES['y_inicial']), int(COORDINATES['y_final']))
     width = abs(int(COORDINATES['x_final']) - int(COORDINATES['x_inicial']))
@@ -128,7 +117,7 @@ def dividir_e_desenhar_contornos(velocidade='normal'):
     cv2.imwrite("CaptchaSolution\\screenshot.png", image)
 
     # Send screenshot to Telegram when captcha is detected
-    send_screenshot_telegram(message="Captcha detectado!")
+    send_screenshot_telegram(message=f"{username}: Captcha detectado!")
 
     altura, largura, _ = image.shape
     tamanho_quadrado_largura = largura // 8
@@ -195,30 +184,7 @@ def record_historical_action(username, action):
     db.close()
     log(f"Ação '{action}' registrada para o usuário {username}.")
 
-def initiate_battle(battle_detection_image, battle_keys):
-    global last_monitoring_check, monitoring_status, monitoramento_enviado, last_historical_record
-
-    current_time = datetime.now()
-    log(f"Monitoramento status:{monitoramento_enviado}")
-    if ((current_time - last_monitoring_check) > timedelta(minutes=5)) and monitoramento_enviado == False:
-        try:
-            # Verifica o status de monitoramento da base de dados
-            db = Database()
-            monitoring_status = db.get_monitoring_status()
-            db.close()
-            last_monitoring_check = current_time
-            monitoramento_enviado = True
-            
-            if monitoring_status:
-                send_screenshot_telegram(message="Início da batalha validado!")
-        except Exception as ex:
-            log(f"{ex}")
-
-    # Record historical action every 30 minutes
-    if current_time - last_historical_record >= timedelta(minutes=30):
-        record_historical_action("username", "executando")
-        last_historical_record = current_time
-
+def initiate_battle(battle_detection_image, battle_keys):    
     while is_image_on_screen(IMAGE_PATHS['battle_finish']):
         pyautogui.press('v')
         log("Procurando batalha: pressionando 'F'.")        

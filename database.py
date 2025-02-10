@@ -4,6 +4,7 @@ import requests
 from dateutil import parser
 from statistics import median
 import pytz
+from bson import ObjectId
 
 class Database:
     def __init__(self):
@@ -140,7 +141,9 @@ class Database:
     def get_monitoring_status(self):
         """Fetch the monitoring status from the database"""
         try:
-            monitor_doc = self.db.monitoramento.find_one({"_id": "67a9227d15c87405944dfad2"})
+            # Use ObjectId para garantir que o _id está no formato correto
+            monitor_doc = self.db.monitoramento.find_one({"_id": ObjectId("67a9227d15c87405944dfad2")})
+            print(monitor_doc)
             if monitor_doc:
                 return monitor_doc.get("ativado", False)
             return False
