@@ -998,7 +998,6 @@ class MainWindow(QMainWindow):
         # Check if the selected resolution is 1366x768
         if resolucao_selecionada == "1366x768":
             QMessageBox.warning(self, "Aviso", "No momento a automação não é capaz de rodar nessa resolução.")
-            return
 
         largura, altura = map(int, resolucao_selecionada.split("x"))
         
