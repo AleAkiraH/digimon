@@ -6,6 +6,7 @@ from dateutil import parser
 from statistics import median
 import pytz
 from bson import ObjectId
+import uuid
 
 class Database:
     def __init__(self):
@@ -150,4 +151,45 @@ class Database:
             return False
         except Exception as e:
             print(f"Erro ao buscar status de monitoramento: {str(e)}")
+            return False
+
+    def check_user_online(self, username):
+        try:
+            result = self.db.usuarios_online.find_one({"username": username})
+            return result
+        except Exception as e:
+            print(f"Erro ao verificar usuário online: {e}")
+            return None
+
+    def add_user_online(self, username):
+        try:
+            session_id = str(uuid.uuid4())
+            login_time = datetime.now()
+            self.db.usuarios_online.insert_one({
+                "username": username,
+                "login_time": login_time,
+                "session_id": session_id
+            })
+            return session_id
+        except Exception as e:
+            print(f"Erro ao adicionar usuário online: {e}")
+            return None
+
+    def remove_user_online(self, username):
+        try:
+            self.db.usuarios_online.delete_one({"username": username})
+            return True
+        except Exception as e:
+            print(f"Erro ao remover usuário online: {e}")
+            return False
+
+    def validate_session(self, username, session_id):
+        try:
+            result = self.db.usuarios_online.find_one({
+                "username": username,
+                "session_id": session_id
+            })
+            return result is not None
+        except Exception as e:
+            print(f"Erro ao validar sessão: {e}")
             return False

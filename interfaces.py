@@ -88,6 +88,12 @@ class AutomationThread(QThread):
                 time.sleep(0.1)
                 continue
             
+            # Validate session
+            if not self.main_window.validate_automation_session():
+                self.status_update.emit("Sessão inválida! Automação interrompida.")
+                self.is_running = False
+                break
+                
             try:
                 if is_image_on_screen(IMAGE_PATHS['captcha_exists']):
                     
@@ -224,7 +230,7 @@ class KeyButton(QPushButton):
 class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
-        self.setWindowTitle("Digimon Automation")
+        self.setWindowTitle("Automação Digimon")
         self.setGeometry(100, 100, 800, 600)
         self.setStyleSheet("""
             QMainWindow {
@@ -286,7 +292,7 @@ class MainWindow(QMainWindow):
                 padding: 0 5px 0 5px;
             }
         """)
-
+        self.session_id = None
         self.is_authenticated = False
         self.current_user = None
         self.automation_thread = None
@@ -300,7 +306,6 @@ class MainWindow(QMainWindow):
         }
 
         self.db = Database()
-
         self.setup_ui()
         self.carregar_imagens()
 
@@ -322,7 +327,7 @@ class MainWindow(QMainWindow):
 
     def setup_auth_tab(self):
         self.tab_auth = QWidget()
-        self.tabs.addTab(self.tab_auth, "Login")
+        self.tabs.addTab(self.tab_auth, "Entrar")
         
         # Main container with fixed width
         container = QWidget()
@@ -334,9 +339,9 @@ class MainWindow(QMainWindow):
         # Center the container
         main_layout = QHBoxLayout(self.tab_auth)
         main_layout.addWidget(container)
-        
+
         # Logo and title
-        title_label = QLabel("Digimon Automation")
+        title_label = QLabel("Automação Digimon")
         title_label.setStyleSheet("""
             font-size: 28px;
             font-weight: bold;
@@ -345,7 +350,7 @@ class MainWindow(QMainWindow):
         """)
         title_label.setAlignment(Qt.AlignCenter)
         container_layout.addWidget(title_label)
-        
+
         # Login form
         login_form = QGroupBox()
         login_form.setStyleSheet("""
@@ -357,14 +362,14 @@ class MainWindow(QMainWindow):
         """)
         form_layout = QVBoxLayout(login_form)
         form_layout.setSpacing(15)
-        
+
         # Username
-        username_label = QLabel("Username")
+        username_label = QLabel("Usuário")
         username_label.setStyleSheet("color: #666; font-size: 14px;")
         form_layout.addWidget(username_label)
         
         self.username_input = QLineEdit()
-        self.username_input.setPlaceholderText("Enter your username")
+        self.username_input.setPlaceholderText("Digite seu usuário")
         self.username_input.setStyleSheet("""
             QLineEdit {
                 padding: 12px;
@@ -377,14 +382,14 @@ class MainWindow(QMainWindow):
             }
         """)
         form_layout.addWidget(self.username_input)
-        
+
         # Password
-        password_label = QLabel("Password")
+        password_label = QLabel("Senha")
         password_label.setStyleSheet("color: #666; font-size: 14px;")
         form_layout.addWidget(password_label)
         
         self.password_input = QLineEdit()
-        self.password_input.setPlaceholderText("Enter your password")
+        self.password_input.setPlaceholderText("Digite sua senha")
         self.password_input.setEchoMode(QLineEdit.Password)
         self.password_input.setStyleSheet("""
             QLineEdit {
@@ -426,9 +431,9 @@ class MainWindow(QMainWindow):
         self.login_status.setAlignment(Qt.AlignCenter)
         self.login_status.hide()  # Initially hidden
         form_layout.addWidget(self.login_status)
-        
+
         # Login button
-        self.login_button = QPushButton("Login")
+        self.login_button = QPushButton("Entrar")
         self.login_button.setCursor(Qt.PointingHandCursor)
         self.login_button.setStyleSheet("""
             QPushButton {
@@ -465,9 +470,9 @@ class MainWindow(QMainWindow):
         # Center the container
         main_layout = QHBoxLayout(self.tab_jogar)
         main_layout.addWidget(container)
-        
+
         # Title
-        title_label = QLabel("Digimon Automation")
+        title_label = QLabel("Automação Digimon")
         title_label.setStyleSheet("""
             font-size: 28px;
             font-weight: bold;
@@ -488,7 +493,7 @@ class MainWindow(QMainWindow):
         """)
         content_layout = QVBoxLayout(content_group)
         content_layout.setSpacing(15)
-        
+
         # Description
         description = QLabel("Prepare-se para uma aventura emocionante no mundo dos Digimons!")
         description.setStyleSheet("""
@@ -499,7 +504,7 @@ class MainWindow(QMainWindow):
         description.setAlignment(Qt.AlignCenter)
         description.setWordWrap(True)
         content_layout.addWidget(description)
-        
+
         # Status label
         self.status_label = QLabel("Status: Parado")
         self.status_label.setStyleSheet("""
@@ -551,9 +556,12 @@ class MainWindow(QMainWindow):
         # Buttons container
         buttons_container = QWidget()
         buttons_layout = QHBoxLayout(buttons_container)
-        
+        buttons_layout.setSpacing(10)  # Add spacing between buttons
+        buttons_layout.setContentsMargins(0, 10, 0, 10)  # Add vertical margins
+
         # Start/Stop button
         self.start_stop_button = QPushButton("Iniciar Automação")
+        self.start_stop_button.setMinimumWidth(180)  # Set minimum width
         self.start_stop_button.setStyleSheet("""
             QPushButton {
                 background-color: #4CAF50;
@@ -572,7 +580,29 @@ class MainWindow(QMainWindow):
         self.start_stop_button.clicked.connect(self.escolher_resolucao)
         buttons_layout.addWidget(self.start_stop_button)
         
+        # Add logoff button
+        self.logoff_button = QPushButton("Sair")
+        self.logoff_button.setMinimumWidth(180)  # Set minimum width
+        self.logoff_button.setStyleSheet("""
+            QPushButton {
+                background-color: #dc3545;
+                color: white;
+                border: none;
+                border-radius: 5px;
+                padding: 12px;
+                font-size: 16px;
+                font-weight: bold;
+            }
+            QPushButton:hover {
+                background-color: #c82333;
+            }
+        """)
+        self.logoff_button.clicked.connect(self.do_logoff)
+        buttons_layout.addWidget(self.logoff_button)
+
+        buttons_layout.addStretch()  # Add stretch to keep buttons centered
         content_layout.addWidget(buttons_container)
+
         container_layout.addWidget(content_group)
         container_layout.addStretch()
 
@@ -583,13 +613,14 @@ class MainWindow(QMainWindow):
         scroll_area.setWidgetResizable(True)
         scroll_content = QWidget()
         scroll_area.setWidget(scroll_content)
-        
+
         self.layout_configurar = QVBoxLayout(scroll_content)
         self.layout_configurar.setAlignment(Qt.AlignTop)
         self.layout_configurar.setSpacing(20)
-        
+
         main_layout = QVBoxLayout(self.tab_configurar)
         main_layout.addWidget(scroll_area)
+
         title_label = QLabel("Configurações")
         title_label.setStyleSheet("""
             font-size: 28px;
@@ -611,11 +642,10 @@ class MainWindow(QMainWindow):
         """)
         general_layout = QVBoxLayout()
         general_group.setLayout(general_layout)
-        
         self.setup_resolution_config(general_layout)
         self.setup_digievolution_config(general_layout)
         self.layout_configurar.addWidget(general_group)
-
+        config_layout = QHBoxLayout()
         # Adiciona diretamente a configuração das teclas sem a group box
         self.setup_battle_keys_config(self.layout_configurar)
 
@@ -675,7 +705,7 @@ class MainWindow(QMainWindow):
         self.digievolucao_combobox.setFixedWidth(120)
         self.digievolucao_combobox.currentIndexChanged.connect(self.atualizar_digievolucao)
         digievolucao_layout.addWidget(self.digievolucao_combobox)
-        digievolucao_layout.addStretch()   
+        digievolucao_layout.addStretch()
 
     def setup_battle_keys_config(self, layout):
         battle_keys_layout = QVBoxLayout()
@@ -690,7 +720,7 @@ class MainWindow(QMainWindow):
         # Create buttons for each group
         for group_name, keys in key_groups:
             group_layout = QHBoxLayout()
-            
+
             # Add group label
             label = QLabel(f"Grupo {group_name[-1]}:")
             label.setFixedWidth(100)
@@ -718,7 +748,10 @@ class MainWindow(QMainWindow):
             "battle_start_evp.png",
             "battle_finish.png",
             "janela_digimon.png",
-            "battle_detection.png"
+            "battle_detection.png",
+            "skill1.png",
+            "skill2.png",
+            "skill3.png"
         ]
         
         self.coordenadas = [
@@ -727,9 +760,12 @@ class MainWindow(QMainWindow):
             (503, 459, 521, 475),
             (468, 565, 485, 576),
             (503, 192, 666, 203),
-            (768, 541, 779, 554)
+            (768, 541, 779, 554),
+            (503, 192, 666, 203), # temporario
+            (503, 192, 666, 203), # temporario
+            (503, 192, 666, 203) # temporario            
         ]
-
+        
         os.makedirs(SCREENSHOTS_DIR, exist_ok=True)
 
         self.cards = []
@@ -762,6 +798,7 @@ class MainWindow(QMainWindow):
         title.setWordWrap(True)
         title.setAlignment(Qt.AlignCenter)
         card_layout.addWidget(title)
+
         label = QLabel(self)
         label.setFixedSize(150, 100)
         label.setStyleSheet("background-color: #f0f0f0; border: 1px solid #cccccc;")
@@ -779,9 +816,8 @@ class MainWindow(QMainWindow):
         botao_captura.setCursor(Qt.PointingHandCursor)
         botao_captura.clicked.connect(lambda checked, idx=index: self.capturar_imagem(idx))
         card_layout.addWidget(botao_captura)
-        
+
         card.label = label
-        
         return card
 
     def get_title(self, index):
@@ -799,25 +835,44 @@ class MainWindow(QMainWindow):
         username = self.username_input.text().lower()
         password = self.password_input.text()
 
-        # Oculta o botão de login imediatamente após o clique
-        self.login_button.hide()
+        # Verifica se usuário já está online
+        online_status = self.db.check_user_online(username)
+        if online_status:
+            login_time = online_status["login_time"].strftime("%d/%m/%Y %H:%M:%S")
+            reply = QMessageBox.question(
+                self,
+                "Usuário já conectado",
+                f"Este usuário já está conectado desde {login_time}.\nDeseja continuar e desconectar a sessão anterior?",
+                QMessageBox.Yes | QMessageBox.No
+            )
+            if reply == QMessageBox.No:
+                self.login_button.show()
+                return
+            else:
+                # Remove sessão anterior
+                self.db.remove_user_online(username)
 
-        # Mostra a barra de progresso e o status label
+        # Continua com o processo de login
+        self.login_button.hide()
         self.login_progress.show()
         self.login_status.show()
-        self.login_progress.setValue(10)  # Inicia a barra de progresso em 10%
+        self.login_progress.setValue(10)
         self.login_status.setText("Validando credenciais...")
 
-        # Cria e inicia a thread de login
         self.login_thread = LoginThread(self.db, username, password)
         self.login_thread.finished.connect(self.handle_login_result)
         self.login_thread.progress.connect(self.login_progress.setValue)
         self.login_thread.start()
 
     def handle_login_result(self, success, error_message):
-        # Exibe o botão de login novamente
-
         if success:
+            # Adiciona usuário à collection de usuários online
+            self.session_id = self.db.add_user_online(self.username_input.text().lower())
+            if not self.session_id:
+                QMessageBox.warning(self, "Erro", "Erro ao criar sessão online")
+                self.login_button.show()
+                return
+
             self.login_progress.setValue(99)  # Preenche a barra de progresso
             self.login_status.setText("Login realizado com sucesso!")
             self.is_authenticated = True
@@ -845,14 +900,15 @@ class MainWindow(QMainWindow):
 
     def toggle_automation(self):
         self.start_stop_button.hide()  # Esconde o botão imediatamente após o clique
-        QTimer.singleShot(100, self._start_automation_thread)  # Aguarda um breve momento antes de iniciar a automação  # Aguarda um breve momento antes de iniciar a automação
+        self.logoff_button.hide()  # Esconde o botão de logoff também
+        QTimer.singleShot(100, self._start_automation_thread)  # Aguarda um breve momento antes de iniciar a automação
 
     def _start_automation_thread(self):
         if self.app_state == APP_STATES['STOPPED']:
             self.start_automation_thread = QThread()
             self.start_automation_worker = AutomationWorker(self)
             self.start_automation_worker.moveToThread(self.start_automation_thread)
-            
+
             self.start_automation_thread.started.connect(self.start_automation_worker.run)
             self.start_automation_worker.finished.connect(self.start_automation_thread.quit)
             self.start_automation_worker.finished.connect(self.start_automation_worker.deleteLater)
@@ -866,14 +922,17 @@ class MainWindow(QMainWindow):
 
     def on_automation_started(self):
         self.start_stop_button.show()
-        
+        # O botão de logoff permanece escondido durante a automação
+
     def hide_start_stop_button(self):
         self.start_stop_button.hide()
+        self.logoff_button.hide()
     
     def start_automation(self):
         if not self.is_authenticated:
             QMessageBox.warning(self, "Erro", "Por favor, autentique-se primeiro!")
-            self.start_stop_button.show()  # Mostra o botão novamente em caso de erro
+            self.start_stop_button.show()
+            self.logoff_button.show()
             return
 
         self.db.record_action(self.current_user, "inicio automacao")
@@ -911,46 +970,6 @@ class MainWindow(QMainWindow):
         self.update_battles_per_minute(0.00)
         self.start_stop_button.show()  # Mostra o botão "Parar Automação" ao final
 
-    def start_automation(self):
-        if not self.is_authenticated:
-            QMessageBox.warning(self, "Erro", "Por favor, autentique-se primeiro!")
-            self.start_stop_button.show()  # Mostra o botão novamente em caso de erro
-            return
-
-        self.db.record_action(self.current_user, "inicio automacao")
-        self.app_state = APP_STATES['RUNNING']
-        self.start_stop_button.setText("Parar Automação")
-        self.start_stop_button.setStyleSheet("""
-            QPushButton {
-                background-color: #dc3545;
-                color: white;
-                border: none;
-                border-radius: 5px;
-                padding: 12px;
-                font-size: 16px;
-                font-weight: bold;
-            }
-            QPushButton:hover {
-                background-color: #c82333;
-            }
-        """)
-        self.status_label.setText("Status: Em execução")
-
-        if self.automation_thread is None:
-            self.automation_thread = AutomationThread(self)
-            self.automation_thread.status_update.connect(self.update_status)
-            self.automation_thread.time_update.connect(self.update_time)
-            self.automation_thread.battles_update.connect(self.update_battles)
-            self.automation_thread.battles_per_minute_update.connect(self.update_battles_per_minute)
-            self.automation_thread.start()
-        else:
-            self.automation_thread.reset()
-            self.automation_thread.resume()
-
-        self.update_time("00:00:00")
-        self.update_battles(0)
-        self.update_battles_per_minute(0.00)
-        
     def stop_automation(self):
         if self.automation_thread:
             self.automation_thread.stop()
@@ -974,30 +993,21 @@ class MainWindow(QMainWindow):
                 background-color: #45a049;
             }
         """)
-        self.start_stop_button.show()  # Mostra o botão "Iniciar Automação"
+        # Mostra ambos os botões quando a automação é parada
+        self.start_stop_button.show()
+        self.logoff_button.show()
+        
         self.status_label.setText("Status: Parado")
         self.update_time("00:00:00")
         self.update_battles(0)
         self.update_battles_per_minute(0.00)
 
-    def update_status(self, message):
-        self.status_label.setText(f"Status: {message}")
-
-    def update_time(self, time_str):
-        self.time_label.setText(f"Tempo decorrido: {time_str}")
-
-    def update_battles(self, battles):
-        self.battles_label.setText(f"Batalhas realizadas: {battles}")
-
-    def update_battles_per_minute(self, battles_per_minute):
-        self.battles_per_minute_label.setText(f"Batalhas por minuto: {battles_per_minute:.2f}")
-
     def escolher_resolucao(self):
         resolucao_selecionada = self.resolucao_combobox.currentText()
-
         # Check if the selected resolution is 1366x768
         if resolucao_selecionada == "1366x768":
             QMessageBox.warning(self, "Aviso", "No momento a automação não é capaz de rodar nessa resolução.")
+            return
 
         largura, altura = map(int, resolucao_selecionada.split("x"))
         
@@ -1021,7 +1031,6 @@ class MainWindow(QMainWindow):
             imagem = QImage.fromData(imagem_data)
             pixmap = QPixmap(imagem)
             self.cards[index].label.setPixmap(pixmap)
-            
             filename = os.path.join(SCREENSHOTS_DIR, self.image_filenames[index])
             with open(filename, 'wb') as f:
                 f.write(imagem_data)
@@ -1046,7 +1055,7 @@ class MainWindow(QMainWindow):
         rect = win32gui.GetWindowRect(hwnd)
         client_rect = win32gui.GetClientRect(hwnd)
         x_tela, y_tela = win32gui.ClientToScreen(hwnd, (client_rect[0], client_rect[1]))
-        
+
         x_inicio += x_tela
         y_inicio += y_tela
         x_fim += x_tela
@@ -1083,6 +1092,7 @@ class MainWindow(QMainWindow):
         print("Current battle keys:", self.battle_keys)
 
     def carregar_imagens(self):
+        os.makedirs(SCREENSHOTS_DIR, exist_ok=True)
         for i, card in enumerate(self.cards):
             image_path = os.path.join(SCREENSHOTS_DIR, self.image_filenames[i])
             if os.path.exists(image_path):
@@ -1091,26 +1101,27 @@ class MainWindow(QMainWindow):
                 scaled_pixmap = pixmap.scaled(150, 100, Qt.KeepAspectRatio, Qt.SmoothTransformation)
                 card.label.setPixmap(scaled_pixmap)
 
-    def update_battle_key(self, key, group):
-        button = self.sender()
-        is_checked = button.isChecked()
+    def validate_automation_session(self):
+        if not self.session_id:
+            QMessageBox.warning(self, "Erro", "Sessão inválida, por favor faça login novamente")
+            return False
+        return self.db.validate_session(self.current_user, self.session_id)
 
-        # If the button was unchecked, clear the key for this group
-        if not is_checked:
-            self.battle_keys[group] = ''
+    def do_logoff(self):
+        if self.automation_thread and self.automation_thread.is_running:
+            QMessageBox.warning(self, "Erro", "Por favor, pare a automação antes de fazer logoff")
             return
 
-        # Update the key for this group
-        self.battle_keys[group] = key
-
-        # Uncheck other buttons in the same group
-        parent = button.parent()
-        for other_button in parent.findChildren(KeyButton):
-            if other_button != button and other_button.property('group') == group:
-                other_button.setChecked(False)
-
-        # Print current state of battle keys
-        print("Current battle keys:", self.battle_keys)
+        self.db.remove_user_online(self.current_user)
+        self.is_authenticated = False
+        self.current_user = None
+        self.session_id = None
+        self.tabs.setTabEnabled(1, False)
+        self.tabs.setTabEnabled(2, False)
+        self.tabs.setCurrentIndex(0)
+        self.username_input.clear()
+        self.password_input.clear()
+        QMessageBox.information(self, "Sucesso", "Desconectado com sucesso!")
 
     def update_license_info(self):
         if self.license_expiration:
@@ -1120,3 +1131,16 @@ class MainWindow(QMainWindow):
             self.license_info_label.setText(f"{expiration_text}\n{days_left_text}")
         else:
             self.license_info_label.setText("Informações da licença não disponíveis")
+
+    def update_status(self, message):
+        self.status_label.setText(f"Status: {message}")
+
+    def update_time(self, time_str):
+        self.time_label.setText(f"Tempo decorrido: {time_str}")
+
+    def update_battles(self, battles):
+        self.battles_label.setText(f"Batalhas realizadas: {battles}")
+
+    def update_battles_per_minute(self, battles_per_minute):
+        self.battles_per_minute_label.setText(f"Batalhas por minuto: {battles_per_minute:.2f}")
+```
