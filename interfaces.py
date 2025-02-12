@@ -1104,8 +1104,15 @@ class MainWindow(QMainWindow):
     def validate_automation_session(self):
         if not self.session_id:
             QMessageBox.warning(self, "Erro", "Sessão inválida, por favor faça login novamente")
+            sys.exit()  # Encerra completamente o programa
             return False
-        return self.db.validate_session(self.current_user, self.session_id)
+        
+        if not self.db.validate_session(self.current_user, self.session_id):
+            QMessageBox.warning(self, "Erro", "Sessão inválida, por favor faça login novamente")
+            sys.exit()  # Encerra completamente o programa
+            return False
+            
+        return True
 
     def do_logoff(self):
         if self.automation_thread and self.automation_thread.is_running:
