@@ -1,7 +1,7 @@
 import sys
 from PyQt5.QtWidgets import (QApplication, QMainWindow, QMessageBox, QVBoxLayout, 
     QHBoxLayout, QWidget, QLabel, QPushButton, QComboBox, QGroupBox, QTabWidget, 
-    QLineEdit, QScrollArea, QFrame, QProgressBar)
+    QLineEdit, QScrollArea, QFrame, QProgressBar, QGridLayout)  # Added QGridLayout
 from PyQt5.QtCore import Qt, QThread, pyqtSignal, QTimer, QObject
 from PyQt5.QtGui import QPixmap, QImage
 from functions import send_screenshot_telegram
@@ -380,8 +380,64 @@ class MainWindow(QMainWindow):
         }
 
         self.db = Database()
+
+        # Initialize skill positions and coordinates before setup_ui
+        self.skill_positions = {
+            'group1': {
+                'Q': (240, 562, 255, 577),
+                'W': (265, 562, 281, 578),
+                'E': (288, 563, 305, 578)
+            },
+            'group2': {
+                'A': (392, 562, 409, 577),
+                'S': (417, 562, 432, 577),
+                'D': (441, 562, 457, 577)
+            },
+            'group3': {
+                'Z': (543, 562, 560, 577),
+                'X': (569, 562, 585, 577),
+                'C': (594, 562, 611, 577)
+            }
+        }
+
+        self.coordenadas = [
+            (503, 377, 596, 393),  # HP bar
+            (503, 417, 563, 433),  # SP bar
+            (503, 459, 521, 475),  # EVP bar
+            (468, 565, 485, 576),  # Battle finish
+            (503, 192, 666, 203),  # Janela digimon
+            (768, 541, 779, 554),  # Battle detection
+            (288, 563, 305, 578),  # Skill 1 (E)
+            (441, 562, 457, 577),  # Skill 2 (D)
+            (594, 562, 611, 577)   # Skill 3 (C)
+        ]
+
+        self.image_filenames = [
+            "battle_start_hp.png",
+            "battle_start_sp.png",
+            "battle_start_evp.png",
+            "battle_finish.png",
+            "janela_digimon.png",
+            "battle_detection.png",
+            "skill1.png",
+            "skill2.png",
+            "skill3.png"
+        ]
+
+        # Initialize combo boxes
+        self.resolucao_combobox = QComboBox()
+        self.resolucao_combobox.addItems(["800x600", "1366x768"])
+        
+        self.digievolucao_combobox = QComboBox()
+        self.digievolucao_combobox.addItems(["mega", "ultimate", "champion", "rookie"])
+        self.digievolucao_combobox.currentIndexChanged.connect(self.atualizar_digievolucao)
+
+        # Initialize this before setup_ui
+        self.cards = []
+        self.skill_cards = {}  # Add this line
+
         self.setup_ui()
-        self.carregar_imagens()
+        self.carregar_imagens()  # This will now work since self.cards is initialized
 
         # Make window responsive
         screen = QApplication.primaryScreen().geometry()
@@ -717,227 +773,218 @@ class MainWindow(QMainWindow):
     def setup_config_tab(self):
         self.tab_configurar = QWidget()
         self.tabs.addTab(self.tab_configurar, "Configurar")
-        scroll_area = QScrollArea()
-        scroll_area.setWidgetResizable(True)
-        scroll_content = QWidget()
-        scroll_area.setWidget(scroll_content)
+        
+        # Main layout with scroll
+        scroll = QScrollArea()
+        scroll.setWidgetResizable(True)
+        scroll.setStyleSheet("""
+            QScrollArea { border: none; background: transparent; }
+            QScrollBar:vertical { width: 8px; background: #F0F0F0; }
+            QScrollBar::handle:vertical { background: #BDBDBD; border-radius: 4px; }
+        """)
 
-        self.layout_configurar = QVBoxLayout(scroll_content)
-        self.layout_configurar.setAlignment(Qt.AlignTop)
-        self.layout_configurar.setSpacing(20)
+        content = QWidget()
+        layout = QVBoxLayout(content)
+        layout.setSpacing(20)
+        layout.setContentsMargins(20, 20, 20, 20)
 
+        # Header
+        header = self._create_config_header()
+        layout.addWidget(header)
+
+        # Config sections
+        layout.addWidget(self._create_game_settings())
+        layout.addWidget(self._create_battle_settings())
+
+        scroll.setWidget(content)
+        
+        # Set main layout
         main_layout = QVBoxLayout(self.tab_configurar)
-        main_layout.addWidget(scroll_area)
+        main_layout.setContentsMargins(0, 0, 0, 0)
+        main_layout.addWidget(scroll)
 
-        title_label = QLabel("Configurações")
-        title_label.setStyleSheet("""
-            font-size: 28px;
-            font-weight: bold;
-            color: #4682B4;
-            margin: 20px 0;
+    def _create_config_header(self):
+        header = QWidget()
+        header.setStyleSheet(f"""
+            QWidget {{
+                background: {MODERN_STYLES['GRADIENT_PRIMARY']};
+                border-radius: 15px;
+                min-height: 80px;
+            }}
+            QLabel {{ color: white; }}
         """)
-        title_label.setAlignment(Qt.AlignCenter)
-        self.layout_configurar.addWidget(title_label)
         
-        general_group = QGroupBox("Configurações Gerais")
-        general_group.setStyleSheet("""
-            QGroupBox {
-                background-color: white;
-                border-radius: 10px;
-                padding: 20px;
-                color: #4682B4;
+        layout = QHBoxLayout(header)
+        layout.setContentsMargins(20, 10, 20, 10)
+        
+        title = QLabel("⚙️ Configurações")
+        title.setStyleSheet("font-size: 24px; font-weight: bold;")
+        layout.addWidget(title)
+        
+        return header
+
+    def _create_game_settings(self):
+        section = QWidget()
+        section.setStyleSheet(f"""
+            QWidget {{
+                background: {MODERN_STYLES['SURFACE_COLOR']};
+                border-radius: 12px;
+                padding: 15px;
+            }}
+        """)
+        
+        layout = QVBoxLayout(section)
+        layout.setSpacing(15)
+
+        # Resolution section
+        res_group = QWidget()
+        res_layout = QHBoxLayout(res_group)
+        res_layout.setContentsMargins(0, 0, 0, 0)
+
+        res_label = QLabel("🎮 Resolução")
+        res_label.setStyleSheet("font-size: 16px; font-weight: bold;")
+        res_layout.addWidget(res_label)
+        
+        self.resolucao_combobox.setStyleSheet("""
+            QComboBox {
+                padding: 8px;
+                border: 1px solid #E0E0E0;
+                border-radius: 6px;
+                min-width: 150px;
             }
         """)
-        general_layout = QVBoxLayout()
-        general_group.setLayout(general_layout)
-        self.setup_resolution_config(general_layout)
-        self.setup_digievolution_config(general_layout)
-        self.layout_configurar.addWidget(general_group)
-        config_layout = QHBoxLayout()
-        # Adiciona diretamente a configuração das teclas sem a group box
-        self.setup_battle_keys_config(self.layout_configurar)
+        res_layout.addWidget(self.resolucao_combobox)
+        
+        update_btn = QPushButton("Atualizar")
+        update_btn.setStyleSheet(self._get_button_style())
+        update_btn.clicked.connect(self.escolher_resolucao)
+        res_layout.addWidget(update_btn)
+        res_layout.addStretch()
+        
+        layout.addWidget(res_group)
 
-        capture_group = QGroupBox("Captura de Imagens")
-        capture_layout = QVBoxLayout()
-        capture_group.setLayout(capture_layout)
-        self.mensagem_info = QLabel("Certifique-se de que a tela de informações do Digimon está aberta!")
-        self.mensagem_info.setStyleSheet("font-style: italic; font-size: 16px; color: #4682B4;")
-        capture_layout.addWidget(self.mensagem_info)
-        self.setup_capture_cards(capture_layout)
-        self.layout_configurar.addWidget(capture_group)
+        # Digievolution section
+        digi_group = QWidget()
+        digi_layout = QHBoxLayout(digi_group)
+        digi_layout.setContentsMargins(0, 0, 0, 0)
 
-    def setup_resolution_config(self, layout):
-        config_layout = QHBoxLayout()
-        layout.addLayout(config_layout)
+        digi_label = QLabel("⚔️ Digievolução")
+        digi_label.setStyleSheet("font-size: 16px; font-weight: bold;")
+        digi_layout.addWidget(digi_label)
+        
+        self.digievolucao_combobox.setStyleSheet(self.resolucao_combobox.styleSheet())
+        digi_layout.addWidget(self.digievolucao_combobox)
+        digi_layout.addStretch()
+        
+        layout.addWidget(digi_group)
+        
+        return section
 
-        label_resolucao = QLabel("Resolução do Jogo:")
-        label_resolucao.setFixedWidth(150)
-        config_layout.addWidget(label_resolucao)
-
-        self.resolucao_combobox = QComboBox()
-        self.resolucao_combobox.addItems(["800x600", "1366x768"])  # Add the new resolution option here
-        self.resolucao_combobox.setFixedWidth(120)
-
-        # Adiciona o botão de atualizar ao lado do combobox
-        self.update_resolution_button = QPushButton("Atualizar")
-        self.update_resolution_button.setFixedWidth(100)
-        self.update_resolution_button.setStyleSheet("""
-            QPushButton {
-                background-color: #4682B4;
-                color: white;
-                border: none;
-                padding: 10px;
-                border-radius: 5px;
-                font-size: 14px;
-            }
-            QPushButton:hover {
-                background-color: #1E90FF;
-            }
+    def _create_battle_settings(self):
+        section = QWidget()
+        section.setStyleSheet(f"""
+            QWidget {{
+                background: {MODERN_STYLES['SURFACE_COLOR']};
+                border-radius: 12px;
+                padding: 15px;
+            }}
         """)
-        self.update_resolution_button.setCursor(Qt.PointingHandCursor)
-        self.update_resolution_button.clicked.connect(self.escolher_resolucao)
-        config_layout.addWidget(self.resolucao_combobox)
-        config_layout.addWidget(self.update_resolution_button)
-        config_layout.addStretch()
+        
+        layout = QVBoxLayout(section)
+        
+        title = QLabel("⚔️ Teclas de Batalha")
+        title.setStyleSheet("font-size: 18px; font-weight: bold;")
+        layout.addWidget(title)
 
-    def setup_digievolution_config(self, layout):
-        digievolucao_layout = QHBoxLayout()
-        layout.addLayout(digievolucao_layout)
-
-        label_digievolucao = QLabel("Digievolução:")
-        label_digievolucao.setFixedWidth(150)
-        digievolucao_layout.addWidget(label_digievolucao)
-
-        self.digievolucao_combobox = QComboBox()
-        self.digievolucao_combobox.addItems(["mega", "ultimate", "champion", "rookie"])
-        self.digievolucao_combobox.setFixedWidth(120)
-        self.digievolucao_combobox.currentIndexChanged.connect(self.atualizar_digievolucao)
-        digievolucao_layout.addWidget(self.digievolucao_combobox)
-        digievolucao_layout.addStretch()
-
-    def setup_battle_keys_config(self, layout):
-        battle_keys_layout = QVBoxLayout()
-
-        # Define the key groups
+        keys_layout = QVBoxLayout()
+        keys_layout.setSpacing(10)
+        
+        # Keep the original key groups
         key_groups = [
-            ('group1', ['Q', 'W', 'E']),
-            ('group2', ['A', 'S', 'D']),
-            ('group3', ['Z', 'X', 'C'])
+            ('Grupo 1', 'group1', ['Q', 'W', 'E']),
+            ('Grupo 2', 'group2', ['A', 'S', 'D']),
+            ('Grupo 3', 'group3', ['Z', 'X', 'C'])
         ]
-
-        # Create buttons for each group
-        for group_name, keys in key_groups:
+        
+        for group_name, group_id, keys in key_groups:
             group_layout = QHBoxLayout()
-
-            # Add group label
-            label = QLabel(f"Grupo {group_name[-1]}:")
-            label.setFixedWidth(100)
-            group_layout.addWidget(label)
-
-            # Create button group to handle exclusive selection within group
-            button_group = QHBoxLayout()
+            group_layout.addWidget(QLabel(group_name))
             
-            # Create buttons for each key in the group
             for key in keys:
-                button = KeyButton(key)
-                button.setProperty('group', group_name)  # Store group name as property
-                button.clicked.connect(lambda checked, k=key, g=group_name: self.update_battle_key(k, g))
-                button_group.addWidget(button)
-
-            group_layout.addLayout(button_group)
-            battle_keys_layout.addLayout(group_layout)
-
-        layout.addLayout(battle_keys_layout)
-
-    def setup_capture_cards(self, layout):
-        self.image_filenames = [
-            "battle_start_hp.png",
-            "battle_start_sp.png",
-            "battle_start_evp.png",
-            "battle_finish.png",
-            "janela_digimon.png",
-            "battle_detection.png",
-            "skill1.png",
-            "skill2.png",
-            "skill3.png"
-        ]
-        
-        self.coordenadas = [
-            (503, 377, 596, 393),
-            (503, 417, 563, 433),
-            (503, 459, 521, 475),
-            (468, 565, 485, 576),
-            (503, 192, 666, 203),
-            (768, 541, 779, 554),
-            (503, 192, 666, 203), # temporario
-            (503, 192, 666, 203), # temporario
-            (503, 192, 666, 203) # temporario            
-        ]
-        
-        os.makedirs(SCREENSHOTS_DIR, exist_ok=True)
-
-        self.cards = []
-        cards_layout = QHBoxLayout()
-        cards_layout.setAlignment(Qt.AlignCenter)
-        cards_layout.setSpacing(20)
-        
-        for i in range(len(self.image_filenames)):
-            card = self.create_card(i)
-            self.cards.append(card)
-            cards_layout.addWidget(card)
+                btn = KeyButton(key)
+                btn.setProperty('group', group_id)
+                btn.clicked.connect(lambda checked, k=key, g=group_id: self.update_battle_key(k, g))
+                group_layout.addWidget(btn)
             
-            if (i + 1) % 3 == 0 or i == len(self.image_filenames) - 1:
-                layout.addLayout(cards_layout)
-                cards_layout = QHBoxLayout()
-                cards_layout.setAlignment(Qt.AlignCenter)
-                cards_layout.setSpacing(20)
-
-    def create_card(self, index):
-        card = QFrame()
-        card.setStyleSheet("""
-            background-color: #ffffff;
-            border: 2px solid #4682B4;
-            border-radius: 10px;
-            padding: 10px;
-        """)
-        card_layout = QVBoxLayout(card)
-        title = QLabel(f"{index + 1} - {self.get_title(index)}")
-        title.setStyleSheet("font-size: 12px; font-weight: bold; color: #4682B4;")
-        title.setWordWrap(True)
-        title.setAlignment(Qt.AlignCenter)
-        card_layout.addWidget(title)
-
-        label = QLabel(self)
-        label.setFixedSize(150, 100)
-        label.setStyleSheet("background-color: #f0f0f0; border: 1px solid #cccccc;")
-        label.setAlignment(Qt.AlignCenter)
-        card_layout.addWidget(label)
+            group_layout.addStretch()
+            keys_layout.addLayout(group_layout)
         
-        botao_captura = QPushButton("Capturar")
-        botao_captura.setStyleSheet("""
-            font-size: 12px;
-            background-color: #4682B4;
-            color: white;
-            border-radius: 5px;
-            padding: 5px;
+        layout.addLayout(keys_layout)
+        
+        # Add capture settings after the battle keys
+        capture_settings = self._create_capture_settings()
+        layout.addWidget(capture_settings)
+        
+        return section
+
+    # Keep the _create_capture_card method for creating capture cards
+    def _create_capture_card(self, index, description, coords):
+        card = QFrame()
+        card.setStyleSheet(f"""
+            QFrame {{
+                background: white;
+                border: 1px solid #e0e0e0;
+                border-radius: 8px;
+                padding: 12px;
+            }}
+            QLabel[title="true"] {{
+                color: {MODERN_STYLES['TEXT_PRIMARY']};
+                font-weight: bold;
+                font-size: 14px;
+            }}
+            QLabel[coords="true"] {{
+                color: {MODERN_STYLES['TEXT_SECONDARY']};
+                font-size: 12px;
+                margin-top: 4px;
+            }}
         """)
-        botao_captura.setCursor(Qt.PointingHandCursor)
-        botao_captura.clicked.connect(lambda checked, idx=index: self.capturar_imagem(idx))
-        card_layout.addWidget(botao_captura)
-
-        card.label = label
+        
+        layout = QVBoxLayout(card)
+        layout.setSpacing(8)
+        
+        # Title
+        title = QLabel(description)
+        title.setProperty("title", True)
+        layout.addWidget(title)
+        
+        # Coordinates
+        coords_text = f"Região: {coords[0]}, {coords[1]} → {coords[2]}, {coords[3]}"
+        coords_label = QLabel(coords_text)
+        coords_label.setProperty("coords", True)
+        coords_label.setObjectName("coords_label")
+        layout.addWidget(coords_label)
+        
+        # Preview
+        preview = QLabel()
+        preview.setFixedSize(180, 100)
+        preview.setStyleSheet("""
+            border: 1px dashed #ccc;
+            border-radius: 4px;
+            background: #fafafa;
+            padding: 4px;
+        """)
+        preview.setAlignment(Qt.AlignCenter)
+        layout.addWidget(preview)
+        
+        # Capture button
+        capture_btn = QPushButton("Capturar")
+        capture_btn.setCursor(Qt.PointingHandCursor)
+        capture_btn.setStyleSheet(self._get_button_style())
+        capture_btn.clicked.connect(lambda: self.capturar_imagem(index))
+        layout.addWidget(capture_btn)
+        
+        card.label = preview
         return card
-
-    def get_title(self, index):
-        titles = [
-            "HP digimon na tela de informações do digimon",
-            "SP digimon na tela de informações do digimon",
-            "EVP digimon na tela de informações do digimon",
-            "Item no 5 * atalho de itens",
-            "Seção de descrição dos status do digimon",
-            "3* item de batalha dentro da batalha digimon"
-        ]
-        return titles[index] if index < len(titles) else "Título Desconhecido"
 
     def authenticate(self):
         username = self.username_input.text().lower()
@@ -1195,14 +1242,25 @@ class MainWindow(QMainWindow):
         # Update the key for this group
         self.battle_keys[group] = key
 
+        # Update coordinates based on selected key
+        if key in self.skill_positions[group]:
+            coords = self.skill_positions[group][key]
+            group_index = {'group1': 6, 'group2': 7, 'group3': 8}
+            idx = group_index[group]
+            self.coordenadas[idx] = coords
+
+            # Update the capture card display
+            if group in self.skill_cards:
+                card = self.skill_cards[group]
+                coords_label = card.findChild(QLabel, "coords_label")
+                if coords_label:
+                    coords_label.setText(f"Região: {coords[0]}, {coords[1]} → {coords[2]}, {coords[3]}")
+
         # Uncheck other buttons in the same group
         parent = button.parent()
         for other_button in parent.findChildren(KeyButton):
-            if (other_button != button and other_button.property('group') == group):
+            if other_button != button and other_button.property('group') == group:
                 other_button.setChecked(False)
-
-        # Print current state of battle keys
-        print("Current battle keys:", self.battle_keys)
 
     def carregar_imagens(self):
         os.makedirs(SCREENSHOTS_DIR, exist_ok=True)
@@ -1259,7 +1317,128 @@ class MainWindow(QMainWindow):
         self.time_label.setText(f"Tempo decorrido: {time_str}")
 
     def update_battles(self, battles):
-        self.battles_label.setText(f"Batalhas realizadas: {battles}")
-
-    def update_battles_per_minute(self, battles_per_minute):
         self.battles_per_minute_label.setText(f"Batalhas por minuto: {battles_per_minute:.2f}")
+
+    def update_battles_per_minute(self, bpm):
+        self.battles_per_minute_label.setText(f"{bpm:.2f}/min")
+
+    def _create_capture_card(self, index, description, coords):
+        card = QFrame()
+        card.setStyleSheet(f"""
+            QFrame {{
+                background: white;
+                border: 1px solid #e0e0e0;
+                border-radius: 8px;
+                padding: 12px;
+            }}
+            QLabel[title="true"] {{
+                color: {MODERN_STYLES['TEXT_PRIMARY']};
+                font-weight: bold;
+                font-size: 14px;
+            }}
+            QLabel[coords="true"] {{
+                color: {MODERN_STYLES['TEXT_SECONDARY']};
+                font-size: 12px;
+                margin-top: 4px;
+            }}
+        """)
+        
+        layout = QVBoxLayout(card)
+        layout.setSpacing(8)
+        
+        # Title
+        title = QLabel(description)
+        title.setProperty("title", True)
+        layout.addWidget(title)
+        
+        # Coordinates
+        coords_text = f"Região: {coords[0]}, {coords[1]} → {coords[2]}, {coords[3]}"
+        coords_label = QLabel(coords_text)
+        coords_label.setProperty("coords", True)
+        coords_label.setObjectName("coords_label")  # For finding later
+        layout.addWidget(coords_label)
+        
+        # Preview
+        preview = QLabel()
+        preview.setFixedSize(180, 100)
+        preview.setStyleSheet("""
+            border: 1px dashed #ccc;
+            border-radius: 4px;
+            background: #fafafa;
+            padding: 4px;
+        """)
+        preview.setAlignment(Qt.AlignCenter)
+        layout.addWidget(preview)
+        
+        # Capture button
+        capture_btn = QPushButton("Capturar")
+        capture_btn.setCursor(Qt.PointingHandCursor)
+        capture_btn.setStyleSheet(self._get_button_style())
+        capture_btn.clicked.connect(lambda: self.capturar_imagem(index))
+        layout.addWidget(capture_btn)
+        
+        # Set preview label as card.label for image updating
+        card.label = preview
+        return card
+
+    def _get_button_style(self):
+        return f"""
+            QPushButton {{
+                background: {MODERN_STYLES['PRIMARY_COLOR']};
+                color: white;
+                border: none;
+                border-radius: 6px;
+                padding: 8px 15px;
+                font-weight: bold;
+            }}
+            QPushButton:hover {{
+                background: #1976D2;
+            }}
+        """
+
+    def _create_capture_settings(self):
+        capture_section = QWidget()
+        capture_section.setStyleSheet(f"""
+            QWidget {{
+                background: {MODERN_STYLES['SURFACE_COLOR']};
+                border-radius: 12px;
+                padding: 15px;
+            }}
+        """)
+        
+        layout = QVBoxLayout(capture_section)
+        layout.setSpacing(15)
+
+        # Title
+        title = QLabel("📸 Áreas de Captura")
+        title.setStyleSheet("font-size: 16px; font-weight: bold;")
+        layout.addWidget(title)
+
+        # Create grid layout for capture cards
+        grid = QGridLayout()
+        grid.setSpacing(15)
+        
+        # Add cards to grid (2 columns)
+        captures = [
+            ("Barra de HP", 0),
+            ("Barra de SP", 1),
+            ("Barra de EVP", 2),
+            ("Fim de Batalha", 3),
+            ("Janela Digimon", 4),
+            ("Detecção de Batalha", 5),
+            ("Habilidade 1", 6),
+            ("Habilidade 2", 7),
+            ("Habilidade 3", 8)
+        ]
+
+        for i, (desc, idx) in enumerate(captures):
+            card = self._create_capture_card(idx, desc, self.coordenadas[idx])
+            row = i // 2
+            col = i % 2
+            grid.addWidget(card, row, col)
+            self.cards.append(card)
+
+        layout.addLayout(grid)
+        return capture_section
+
+    # ...rest of the class remains unchanged...

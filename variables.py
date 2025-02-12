@@ -22,7 +22,10 @@ IMAGE_PATHS = {
     'battle_detection': "ScreenSaved/battle_detection.png",
     'battle_finish': "ScreenSaved/battle_finish.png",
     'janela_digimon': "ScreenSaved/janela_digimon.png",
-    'evp_terminado': "ScreenSaved/EVP_Terminado.png"
+    'evp_terminado': "ScreenSaved/EVP_Terminado.png",
+    'skill1': "ScreenSaved/skill1.png",
+    'skill2': "ScreenSaved/skill2.png",
+    'skill3': "ScreenSaved/skill3.png",
 }
 
 # Digivolução coordinates
