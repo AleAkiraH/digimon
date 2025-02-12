@@ -20,6 +20,20 @@ from variables import WINDOW_NAME, RESOLUCAO_PADRAO, SCREENSHOTS_DIR, IMAGE_PATH
 from functions import log, is_image_on_screen, dividir_e_desenhar_contornos, initiate_battle, battle_actions, refill_digimons
 from database import Database
 
+MODERN_STYLES = {
+    'PRIMARY_COLOR': '#2196F3',
+    'SECONDARY_COLOR': '#FF4081',
+    'SUCCESS_COLOR': '#4CAF50',
+    'WARNING_COLOR': '#FFC107',
+    'DANGER_COLOR': '#F44336',
+    'BACKGROUND_COLOR': '#F5F5F5',
+    'SURFACE_COLOR': '#FFFFFF',
+    'TEXT_PRIMARY': '#212121',
+    'TEXT_SECONDARY': '#757575',
+    'BORDER_RADIUS': '8px',
+    'GRADIENT_PRIMARY': 'qlineargradient(x1:0, y1:0, x2:1, y2:0, stop:0 #2196F3, stop:1 #1976D2)'
+}
+
 class AutomationWorker(QObject):
     finished = pyqtSignal()
 
@@ -66,6 +80,25 @@ class LoginThread(QThread):
         except Exception as e:
             self.finished.emit(False, f"Erro ao conectar ao banco de dados: {str(e)}")
 
+class TimeUpdateThread(QThread):
+    time_update = pyqtSignal(str)
+    
+    def __init__(self, start_time):
+        super().__init__()
+        self.start_time = start_time
+        self.is_running = True
+        
+    def run(self):
+        while self.is_running:
+            current_time = datetime.now()
+            elapsed_time = current_time - self.start_time
+            elapsed_time_str = str(elapsed_time).split('.')[0]
+            self.time_update.emit(elapsed_time_str)
+            time.sleep(1)
+            
+    def stop(self):
+        self.is_running = False
+
 class AutomationThread(QThread):
     status_update = pyqtSignal(str)
     time_update = pyqtSignal(str)
@@ -80,119 +113,149 @@ class AutomationThread(QThread):
         self.battles_count = 0
         self.start_time = datetime.now()  # Changed to datetime
         self.last_battle_time = self.start_time
-    
+        self.time_thread = None
+
+    def setup_timer(self):
+        # Create timer in the correct thread
+        self.update_timer = QTimer()
+        self.update_timer.setInterval(1000)  # 1 second
+        self.update_timer.timeout.connect(self.update_elapsed_time)
+        self.update_timer.start()
+
     def run(self):   
+        # Inicia thread separada para atualização do tempo
+        self.time_thread = TimeUpdateThread(self.start_time)
+        self.time_thread.time_update.connect(self.main_window.update_time)
+        self.time_thread.start()
+        
         send_screenshot_telegram(message=f"{self.main_window.current_user}: iniciou automacao!")
+        
         while self.is_running:
-            if self.is_paused:
-                time.sleep(0.1)
-                continue
-            
-            # Validate session
-            if not self.main_window.validate_automation_session():
-                self.status_update.emit("Sessão inválida! Automação interrompida.")
-                self.is_running = False
-                break
-                
             try:
-                if is_image_on_screen(IMAGE_PATHS['captcha_exists']):
-                    
-                    dividir_e_desenhar_contornos(self.main_window.current_user)
+                # Force process events to handle timer
+                QApplication.processEvents()
                 
-                elapsed_time = (datetime.now() - self.start_time).total_seconds()
-                elapsed_hours = int(elapsed_time // 3600)
-                elapsed_minutes = int((elapsed_time % 3600) // 60)
-                elapsed_seconds = int(elapsed_time % 60)
-                elapsed_time_str = f"{elapsed_hours:02}:{elapsed_minutes:02}:{elapsed_seconds:02}"
-
-                self.status_update.emit("Automação principal em execução...")
-                
-                for _ in range(3):
-                    if is_image_on_screen(IMAGE_PATHS['captcha_exists']):
-                        dividir_e_desenhar_contornos(self.main_window.current_user)
-                
-                time.sleep(1)
-                for _ in range(4):
-                    pyautogui.press('g')
-                pyautogui.press('v')
-                time.sleep(1)
-
-                if is_image_on_screen(IMAGE_PATHS['captcha_exists']):
-                    dividir_e_desenhar_contornos(self.main_window.current_user)
-                
-                self.status_update.emit("Tela de digimons aberta...")
-                if is_image_on_screen(IMAGE_PATHS['evp_terminado']):
-                    location = pyautogui.locateCenterOnScreen(IMAGE_PATHS['evp_terminado'], confidence=0.97)
-                    if location:
-                        x, y = location
-                        pyautogui.click(x, y)
-                        time.sleep(0.5)
-                        pyautogui.press('e')
-
-                battle_start_image_HP_Try = 3
-                while not is_image_on_screen(IMAGE_PATHS['battle_start_hp']) and self.is_running and not self.is_paused:
-                    if is_image_on_screen(IMAGE_PATHS['captcha_exists']):
-                        dividir_e_desenhar_contornos(self.main_window.current_user)
-                    if battle_start_image_HP_Try == 0:
-                        self.status_update.emit("Imagem de inicio de batalha não encontrada.")
-                        if not is_image_on_screen(IMAGE_PATHS['janela_digimon']):
-                            pyautogui.press('v')                        
-                        break
-                    battle_start_image_HP_Try -= 1
-                    time.sleep(1)
-
-                if not self.is_running or self.is_paused:
+                if self.is_paused:
+                    time.sleep(0.1)
                     continue
-
-                time.sleep(1)
-                self.status_update.emit("Buscando imagem de inicio de batalha")
-                
-                if all(is_image_on_screen(IMAGE_PATHS[img]) for img in ['battle_start_hp', 'battle_start_sp', 'battle_start_evp']):
-                    self.status_update.emit("Imagem de início de batalha detectada.")                
-                    pyautogui.press('i')
-                    self.status_update.emit("Procurando batalha: pressionando 'F'.")
-                    if is_image_on_screen(IMAGE_PATHS['captcha_exists']):
-                        dividir_e_desenhar_contornos(self.main_window.current_user)
-                    time.sleep(1)
-                    initiate_battle(IMAGE_PATHS['battle_detection'], self.main_window.battle_keys)
                     
+                # Validate session
+                if not self.main_window.validate_automation_session():
+                    self.status_update.emit("Sessão inválida! Automação interrompida.")
+                    self.is_running = False
+                    break
+                    
+                try:
                     if is_image_on_screen(IMAGE_PATHS['captcha_exists']):
-                        dividir_e_desenhar_contornos(self.main_window.current_user)
                         
-                    battle_actions(IMAGE_PATHS['battle_detection'], IMAGE_PATHS['battle_finish'], self.main_window.battle_keys)
-                    self.battles_count += 1
-                    current_time = datetime.now()
-                    elapsed_time = (current_time - self.start_time).total_seconds() / 60  # in minutes
-                    battles_per_minute = self.battles_count / elapsed_time if elapsed_time > 0 else 0
-                    self.battles_per_minute_update.emit(battles_per_minute)
+                        dividir_e_desenhar_contornos(self.main_window.current_user)
                     
+                    elapsed_time = (datetime.now() - self.start_time).total_seconds()
+                    elapsed_hours = int(elapsed_time // 3600)
+                    elapsed_minutes = int((elapsed_time % 3600) // 60)
+                    elapsed_seconds = int(elapsed_time % 60)
+                    elapsed_time_str = f"{elapsed_hours:02}:{elapsed_minutes:02}:{elapsed_seconds:02}"
+
+                    self.status_update.emit("Automação principal em execução...")
+                    
+                    for _ in range(3):
+                        if is_image_on_screen(IMAGE_PATHS['captcha_exists']):
+                            dividir_e_desenhar_contornos(self.main_window.current_user)
+                    
+                    time.sleep(1)
+                    for _ in range(4):
+                        pyautogui.press('g')
+                    pyautogui.press('v')
+                    time.sleep(1)
+
                     if is_image_on_screen(IMAGE_PATHS['captcha_exists']):
                         dividir_e_desenhar_contornos(self.main_window.current_user)
-                else:
-                    if not is_image_on_screen(IMAGE_PATHS['battle_start_evp']):
-                        pyautogui.press('v')
-                        for _ in range(35):
-                            if not self.is_running or self.is_paused:
-                                break
-                            if is_image_on_screen(IMAGE_PATHS['captcha_exists']):
-                                dividir_e_desenhar_contornos(self.main_window.current_user)
-                            pyautogui.press('5')
-                            time.sleep(0.5)                       
-                        pyautogui.press('v')
-                    refill_digimons(self.main_window.digievolucao_combobox.currentText())
                     
+                    self.status_update.emit("Tela de digimons aberta...")
+                    if is_image_on_screen(IMAGE_PATHS['evp_terminado']):
+                        location = pyautogui.locateCenterOnScreen(IMAGE_PATHS['evp_terminado'], confidence=0.97)
+                        if location:
+                            x, y = location
+                            pyautogui.click(x, y)
+                            time.sleep(0.5)
+                            pyautogui.press('e')
+
+                    battle_start_image_HP_Try = 3
+                    while not is_image_on_screen(IMAGE_PATHS['battle_start_hp']) and self.is_running and not self.is_paused:
+                        if is_image_on_screen(IMAGE_PATHS['captcha_exists']):
+                            dividir_e_desenhar_contornos(self.main_window.current_user)
+                        if battle_start_image_HP_Try == 0:
+                            self.status_update.emit("Imagem de inicio de batalha não encontrada.")
+                            if not is_image_on_screen(IMAGE_PATHS['janela_digimon']):
+                                pyautogui.press('v')                        
+                            break
+                        battle_start_image_HP_Try -= 1
+                        time.sleep(1)
+
+                    if not self.is_running or self.is_paused:
+                        continue
+
+                    time.sleep(1)
+                    self.status_update.emit("Buscando imagem de inicio de batalha")
+                    
+                    if all(is_image_on_screen(IMAGE_PATHS[img]) for img in ['battle_start_hp', 'battle_start_sp', 'battle_start_evp']):
+                        self.status_update.emit("Imagem de início de batalha detectada.")                
+                        pyautogui.press('i')
+                        self.status_update.emit("Procurando batalha: pressionando 'F'.")
+                        if is_image_on_screen(IMAGE_PATHS['captcha_exists']):
+                            dividir_e_desenhar_contornos(self.main_window.current_user)
+                        time.sleep(1)
+                        initiate_battle(IMAGE_PATHS['battle_detection'], self.main_window.battle_keys)
+                        
+                        if is_image_on_screen(IMAGE_PATHS['captcha_exists']):
+                            dividir_e_desenhar_contornos(self.main_window.current_user)
+                            
+                        battle_actions(IMAGE_PATHS['battle_detection'], IMAGE_PATHS['battle_finish'], self.main_window.battle_keys)
+                        self.battles_count += 1
+                        current_time = datetime.now()
+                        elapsed_time = (current_time - self.start_time).total_seconds() / 60  # in minutes
+                        battles_per_minute = self.battles_count / elapsed_time if elapsed_time > 0 else 0
+                        self.battles_per_minute_update.emit(battles_per_minute)
+                        
+                        if is_image_on_screen(IMAGE_PATHS['captcha_exists']):
+                            dividir_e_desenhar_contornos(self.main_window.current_user)
+                    else:
+                        if not is_image_on_screen(IMAGE_PATHS['battle_start_evp']):
+                            pyautogui.press('v')
+                            for _ in range(35):
+                                if not self.is_running or self.is_paused:
+                                    break
+                                if is_image_on_screen(IMAGE_PATHS['captcha_exists']):
+                                    dividir_e_desenhar_contornos(self.main_window.current_user)
+                                pyautogui.press('5')
+                                time.sleep(0.5)                       
+                            pyautogui.press('v')
+                        refill_digimons(self.main_window.digievolucao_combobox.currentText())
+                        
+                except Exception as e:
+                    self.status_update.emit(f"Erro na automação: {str(e)}")
+                
+                current_time = datetime.now()
+                elapsed_time = current_time - self.start_time
+                elapsed_time_str = str(elapsed_time).split('.')[0]  # Remove microseconds
+                self.time_update.emit(elapsed_time_str)
+                self.battles_update.emit(self.battles_count)
+                time.sleep(0.1)  # Previne uso excessivo de CPU
+
             except Exception as e:
                 self.status_update.emit(f"Erro na automação: {str(e)}")
-            
-            current_time = datetime.now()
-            elapsed_time = current_time - self.start_time
-            elapsed_time_str = str(elapsed_time).split('.')[0]  # Remove microseconds
-            self.time_update.emit(elapsed_time_str)
-            self.battles_update.emit(self.battles_count)
-            time.sleep(0.1)  # Previne uso excessivo de CPU
+                time.sleep(0.1)
 
     def stop(self):
         self.is_running = False
+        if hasattr(self, 'update_timer'):
+            self.update_timer.stop()
+            self.update_timer.deleteLater()
+        if self.time_thread:
+            self.time_thread.stop()
+            self.time_thread.wait()
+            self.time_thread.deleteLater()
+            self.time_thread = None
         
     def pause(self):
         self.is_paused = True
@@ -201,9 +264,25 @@ class AutomationThread(QThread):
         self.is_paused = False
 
     def reset(self): # Added reset method
+        if self.time_thread:
+            self.time_thread.stop()
+            self.time_thread.wait()
+            self.time_thread.deleteLater()
         self.start_time = datetime.now()
         self.battles_count = 0
         self.last_battle_time = self.start_time
+        # Reinicia thread de tempo com novo start_time
+        self.time_thread = TimeUpdateThread(self.start_time)
+        self.time_thread.time_update.connect(self.main_window.update_time)
+        self.time_thread.start()
+
+    def update_elapsed_time(self):
+        if not self.is_running or self.is_paused:
+            return
+        current_time = datetime.now()
+        elapsed_time = current_time - self.start_time
+        elapsed_time_str = str(elapsed_time).split('.')[0]
+        self.time_update.emit(elapsed_time_str)
 
 class KeyButton(QPushButton):
     def __init__(self, key, parent=None):
@@ -230,67 +309,62 @@ class KeyButton(QPushButton):
 class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
+        # Make window vertical and responsive
+        screen = QApplication.primaryScreen().geometry()
+        window_width = min(600, screen.width() * 0.4)  # Narrower width
+        window_height = min(900, screen.height() * 0.9)  # Taller height
+        
+        # Center the window
+        self.setGeometry(
+            (screen.width() - window_width) // 2,
+            (screen.height() - window_height) // 2,
+            window_width, 
+            window_height
+        )
+        
+        # Define container limits first
+        self.MIN_CONTAINER_WIDTH = int(window_width * 0.9)
+        self.MAX_CONTAINER_WIDTH = int(window_width * 0.95)
+        
         self.setWindowTitle("Automação Digimon")
-        self.setGeometry(100, 100, 800, 600)
-        self.setStyleSheet("""
-            QMainWindow {
-                background-color: #f0f0f0;
-            }
-            QTabWidget::pane {
+        self.setStyleSheet(f"""
+            QMainWindow {{
+                background-color: {MODERN_STYLES['BACKGROUND_COLOR']};
+            }}
+            
+            QTabWidget::pane {{
                 border: none;
-                background-color: #ffffff;
-            }
-            QTabWidget::tab-bar {
+                background-color: {MODERN_STYLES['SURFACE_COLOR']};
+                border-radius: {MODERN_STYLES['BORDER_RADIUS']};
+            }}
+            
+            QTabBar {{
                 alignment: center;
-            }
-            QTabBar::tab {
-                background-color: #4682B4;
-                color: white;
-                padding: 10px 20px;
-                margin: 2px;
-                border-top-left-radius: 4px;
-                border-top-right-radius: 4px;
-                font-size: 14px;
-                min-width: 120px;
-            }
-            QTabBar::tab:selected {
-                background-color: #1E90FF;
-            }
-            QPushButton {
-                background-color: #4682B4;
-                color: white;
+                background: transparent;
+            }}
+            
+            QTabBar::tab {{
+                background-color: transparent;
+                color: {MODERN_STYLES['TEXT_SECONDARY']};
+                padding: 15px 30px;
+                margin: 0 5px;
                 border: none;
-                padding: 10px;
-                border-radius: 5px;
-                font-size: 14px;
-            }
-            QPushButton:hover {
-                background-color: #1E90FF;
-            }
-            QComboBox {
-                background-color: white;
-                border: 1px solid #4682B4;
-                border-radius: 5px;
-                padding: 5px;
-                min-width: 100px;
-            }
-            QLabel {
-                color: #333333;
-                font-size: 14px;
-            }
-            QGroupBox {
-                font-size: 18px;
+                font-size: 18px;  /* Increased font size */
                 font-weight: bold;
-                border: 2px solid #4682B4;
-                border-radius: 5px;
-                margin-top: 20px;
-                padding-top: 10px;
-            }
-            QGroupBox::title {
-                subcontrol-origin: margin;
-                left: 10px;
-                padding: 0 5px 0 5px;
-            }
+                min-width: 180px;  /* Increased min width */
+                max-width: 300px;
+            }}
+            
+            QTabBar::tab:selected {{
+                color: {MODERN_STYLES['PRIMARY_COLOR']};
+                border-bottom: 3px solid {MODERN_STYLES['PRIMARY_COLOR']};
+                background-color: rgba(33, 150, 243, 0.1);
+            }}
+            
+            QTabBar::tab:hover {{
+                background-color: rgba(33, 150, 243, 0.05);
+                color: {MODERN_STYLES['PRIMARY_COLOR']};
+            }}
         """)
         self.session_id = None
         self.is_authenticated = False
@@ -308,6 +382,21 @@ class MainWindow(QMainWindow):
         self.db = Database()
         self.setup_ui()
         self.carregar_imagens()
+
+        # Make window responsive
+        screen = QApplication.primaryScreen().geometry()
+        window_width = min(1000, screen.width() * 0.8)
+        window_height = min(700, screen.height() * 0.8)
+        self.setGeometry(
+            (screen.width() - window_width) // 2,
+            (screen.height() - window_height) // 2,
+            window_width, 
+            window_height
+        )
+        
+        # Make container widths responsive
+        self.MIN_CONTAINER_WIDTH = 400
+        self.MAX_CONTAINER_WIDTH = 900
 
     def setup_ui(self):
         self.central_widget = QWidget()
@@ -329,126 +418,114 @@ class MainWindow(QMainWindow):
         self.tab_auth = QWidget()
         self.tabs.addTab(self.tab_auth, "Entrar")
         
-        # Main container with fixed width
+        # Main container
         container = QWidget()
-        container.setFixedWidth(400)
+        container.setFixedWidth(500)  # Increased width
         container_layout = QVBoxLayout(container)
         container_layout.setAlignment(Qt.AlignCenter)
-        container_layout.setSpacing(20)
+        container_layout.setSpacing(24)  # Increased spacing
         
-        # Center the container
+        # Center container
         main_layout = QHBoxLayout(self.tab_auth)
         main_layout.addWidget(container)
 
-        # Logo and title
+        # Logo and title with modern styling
         title_label = QLabel("Automação Digimon")
-        title_label.setStyleSheet("""
-            font-size: 28px;
+        title_label.setStyleSheet(f"""
+            font-size: 36px;
             font-weight: bold;
-            color: #4682B4;
-            margin: 20px 0;
+            color: {MODERN_STYLES['PRIMARY_COLOR']};
+            margin: 32px 0;
+            letter-spacing: 1px;
         """)
         title_label.setAlignment(Qt.AlignCenter)
         container_layout.addWidget(title_label)
 
-        # Login form
+        # Modern login form
         login_form = QGroupBox()
-        login_form.setStyleSheet("""
-            QGroupBox {
-                background-color: white;
-                border-radius: 10px;
-                padding: 20px;
-            }
+        login_form.setStyleSheet(f"""
+            QGroupBox {{
+                background-color: {MODERN_STYLES['SURFACE_COLOR']};
+                border-radius: {MODERN_STYLES['BORDER_RADIUS']};
+                padding: 32px;
+                border: none;
+            }}
         """)
         form_layout = QVBoxLayout(login_form)
-        form_layout.setSpacing(15)
+        form_layout.setSpacing(20)
 
-        # Username
+        # Username field with modern styling
         username_label = QLabel("Usuário")
-        username_label.setStyleSheet("color: #666; font-size: 14px;")
+        username_label.setStyleSheet(f"color: {MODERN_STYLES['TEXT_SECONDARY']}; font-size: 14px; font-weight: bold;")
         form_layout.addWidget(username_label)
         
         self.username_input = QLineEdit()
         self.username_input.setPlaceholderText("Digite seu usuário")
-        self.username_input.setStyleSheet("""
-            QLineEdit {
-                padding: 12px;
-                border: 2px solid #e0e0e0;
-                border-radius: 5px;
-                font-size: 14px;
-            }
-            QLineEdit:focus {
-                border-color: #4682B4;
-            }
-        """)
+        self.username_input.setMinimumHeight(45)
         form_layout.addWidget(self.username_input)
 
-        # Password
+        # Password field with modern styling
         password_label = QLabel("Senha")
-        password_label.setStyleSheet("color: #666; font-size: 14px;")
+        password_label.setStyleSheet(f"color: {MODERN_STYLES['TEXT_SECONDARY']}; font-size: 14px; font-weight: bold;")
         form_layout.addWidget(password_label)
         
         self.password_input = QLineEdit()
         self.password_input.setPlaceholderText("Digite sua senha")
+        self.password_input.setMinimumHeight(45)
         self.password_input.setEchoMode(QLineEdit.Password)
-        self.password_input.setStyleSheet("""
-            QLineEdit {
-                padding: 12px;
-                border: 2px solid #e0e0e0;
-                border-radius: 5px;
-                font-size: 14px;
-            }
-            QLineEdit:focus {
-                border-color: #4682B4;
-            }
-        """)
         form_layout.addWidget(self.password_input)
 
-        # Add progress bar after the password input
+        # Modern progress bar
         self.login_progress = QProgressBar()
-        self.login_progress.setStyleSheet("""
-            QProgressBar {
-                border: 2px solid #e0e0e0;
-                border-radius: 5px;
+        self.login_progress.setStyleSheet(f"""
+            QProgressBar {{
+                border: none;
+                border-radius: 4px;
+                background-color: #E0E0E0;
+                height: 8px;
                 text-align: center;
-                height: 25px;
-            }
-            QProgressBar::chunk {
-                background-color: #4CAF50;
-                border-radius: 3px;
-            }
+            }}
+            QProgressBar::chunk {{
+                background-color: {MODERN_STYLES['PRIMARY_COLOR']};
+                border-radius: 4px;
+            }}
         """)
         self.login_progress.hide()  # Initially hidden
         form_layout.addWidget(self.login_progress)
 
-        # Add status label
+        # Status label with modern styling
         self.login_status = QLabel("")
-        self.login_status.setStyleSheet("""
-            color: #666;
+        self.login_status.setStyleSheet(f"""
+            color: {MODERN_STYLES['TEXT_SECONDARY']};
             font-size: 14px;
-            margin-top: 5px;
+            margin-top: 8px;
         """)
         self.login_status.setAlignment(Qt.AlignCenter)
         self.login_status.hide()  # Initially hidden
         form_layout.addWidget(self.login_status)
 
-        # Login button
+        # Modern login button
         self.login_button = QPushButton("Entrar")
         self.login_button.setCursor(Qt.PointingHandCursor)
-        self.login_button.setStyleSheet("""
-            QPushButton {
-                background-color: #4CAF50;
+        self.login_button.setMinimumHeight(45)
+        self.login_button.setStyleSheet(f"""
+            QPushButton {{
+                background-color: {MODERN_STYLES['PRIMARY_COLOR']};
                 color: white;
                 border: none;
-                border-radius: 5px;
+                border-radius: {MODERN_STYLES['BORDER_RADIUS']};
                 padding: 12px;
                 font-size: 16px;
                 font-weight: bold;
-                margin-top: 10px;
-            }
-            QPushButton:hover {
-                background-color: #45a049;
-            }
+                margin-top: 16px;
+            }}
+            QPushButton:hover {{
+                background-color: #1976D2;
+                transform: translateY(-1px);
+            }}
+            QPushButton:pressed {{
+                transform: translateY(1px);
+            }}
         """)
         self.login_button.clicked.connect(self.authenticate)
         form_layout.addWidget(self.login_button)
@@ -460,151 +537,182 @@ class MainWindow(QMainWindow):
         self.tab_jogar = QWidget()
         self.tabs.addTab(self.tab_jogar, "Jogar")
         
-        # Main container with fixed width
+        # Main container with modern styling
         container = QWidget()
-        container.setFixedWidth(400)
+        container_width = int(self.width() * 0.95)  # Use 95% of window width
+        container.setFixedWidth(container_width)
         container_layout = QVBoxLayout(container)
-        container_layout.setAlignment(Qt.AlignCenter)
-        container_layout.setSpacing(20)
+        container_layout.setAlignment(Qt.AlignTop)  # Changed to top alignment
+        container_layout.setSpacing(15)  # Reduced spacing
         
-        # Center the container
+        # Main layout setup
         main_layout = QHBoxLayout(self.tab_jogar)
         main_layout.addWidget(container)
 
-        # Title
+        # Header Section with gradient background
+        header_widget = QWidget()
+        header_layout = QVBoxLayout(header_widget)
+        header_widget.setStyleSheet(f"""
+            QWidget {{
+                background: {MODERN_STYLES['GRADIENT_PRIMARY']};
+                border-radius: 20px;
+                padding: 30px;
+                margin: 20px;
+            }}
+        """)
+
+        # Header content
         title_label = QLabel("Automação Digimon")
         title_label.setStyleSheet("""
-            font-size: 28px;
+            font-size: 36px;
             font-weight: bold;
-            color: #4682B4;
-            margin: 20px 0;
+            color: white;
+            margin: 15px 0;
         """)
         title_label.setAlignment(Qt.AlignCenter)
-        container_layout.addWidget(title_label)
+        header_layout.addWidget(title_label)
+
+        # Status Cards Container with vertical layout
+        stats_container = QWidget()
+        stats_layout = QVBoxLayout(stats_container)
+        stats_layout.setSpacing(10)
+        stats_layout.setContentsMargins(10, 10, 10, 10)
         
-        # Main content group
-        content_group = QGroupBox()
-        content_group.setStyleSheet("""
-            QGroupBox {
-                background-color: white;
-                border-radius: 10px;
-                padding: 20px;
+        # Create cards with full width - removed status card
+        cards_data = [
+            ("Tempo", "00:00:00", "time_label", "#2196F3"),
+            ("Batalhas", "0", "battles_label", "#FF9800"),
+            ("Taxa", "0.00/min", "battles_per_minute_label", "#9C27B0")
+        ]
+        
+        for title, initial_value, label_name, color in cards_data:
+            card = self.create_info_card(title, initial_value, label_name, color)
+            card.setMinimumWidth(int(container_width * 0.9))
+            card.setFixedHeight(70)  # Fixed height for cards
+            stats_layout.addWidget(card)
+        
+        container_layout.addWidget(stats_container)
+
+        # License Info Card with proper initialization
+        license_card = QWidget()
+        license_card.setStyleSheet("""
+            QWidget {
+                background: white;
+                border: 2px solid #e0e0e0;
+                border-radius: 15px;
+                padding: 25px;
+                margin: 10px;
             }
         """)
-        content_layout = QVBoxLayout(content_group)
-        content_layout.setSpacing(15)
-
-        # Description
-        description = QLabel("Prepare-se para uma aventura emocionante no mundo dos Digimons!")
-        description.setStyleSheet("""
-            font-size: 16px;
-            color: #666;
-            margin-bottom: 20px;
-        """)
-        description.setAlignment(Qt.AlignCenter)
-        description.setWordWrap(True)
-        content_layout.addWidget(description)
-
-        # Status label
-        self.status_label = QLabel("Status: Parado")
-        self.status_label.setStyleSheet("""
-            font-size: 14px;
-            color: #666;
-            margin: 10px 0;
-        """)
-        self.status_label.setAlignment(Qt.AlignCenter)
-        content_layout.addWidget(self.status_label)
-
-        self.time_label = QLabel("Tempo decorrido: 00:00:00")
-        self.time_label.setStyleSheet("""
-            font-size: 14px;
-            color: #666;
-            margin: 5px 0;
-        """)
-        self.time_label.setAlignment(Qt.AlignCenter)
-        content_layout.addWidget(self.time_label)
-
-        self.battles_label = QLabel("Batalhas realizadas: 0")
-        self.battles_label.setStyleSheet("""
-            font-size: 14px;
-            color: #666;
-            margin: 5px 0;
-        """)
-        self.battles_label.setAlignment(Qt.AlignCenter)
-        content_layout.addWidget(self.battles_label)
+        license_layout = QVBoxLayout(license_card)
         
-        # Add new label for battles per minute
-        self.battles_per_minute_label = QLabel("Batalhas por minuto: 0.00")
-        self.battles_per_minute_label.setStyleSheet("""
-            font-size: 14px;
-            color: #666;
-            margin: 5px 0;
-        """)
-        self.battles_per_minute_label.setAlignment(Qt.AlignCenter)
-        content_layout.addWidget(self.battles_per_minute_label)
-
-        # License information label
         self.license_info_label = QLabel("Informações da licença não disponíveis")
         self.license_info_label.setStyleSheet("""
-            font-size: 14px;
+            font-size: 16px;
             color: #666;
-            margin: 10px 0;
+            padding: 10px;
         """)
         self.license_info_label.setAlignment(Qt.AlignCenter)
-        content_layout.addWidget(self.license_info_label)
+        license_layout.addWidget(self.license_info_label)
+        container_layout.addWidget(license_card)
 
-        # Buttons container
+        # Action Buttons Container
         buttons_container = QWidget()
         buttons_layout = QHBoxLayout(buttons_container)
-        buttons_layout.setSpacing(10)  # Add spacing between buttons
-        buttons_layout.setContentsMargins(0, 10, 0, 10)  # Add vertical margins
+        buttons_layout.setSpacing(20)
+        buttons_layout.setAlignment(Qt.AlignCenter)
 
-        # Start/Stop button
+        # Start/Stop Button with modern design
         self.start_stop_button = QPushButton("Iniciar Automação")
-        self.start_stop_button.setMinimumWidth(180)  # Set minimum width
-        self.start_stop_button.setStyleSheet("""
-            QPushButton {
-                background-color: #4CAF50;
+        self.start_stop_button.setMinimumWidth(250)
+        self.start_stop_button.setMinimumHeight(50)
+        self.start_stop_button.setCursor(Qt.PointingHandCursor)
+        self.start_stop_button.setStyleSheet(f"""
+            QPushButton {{
+                background-color: {MODERN_STYLES['SUCCESS_COLOR']};
                 color: white;
                 border: none;
-                border-radius: 5px;
-                padding: 12px;
+                border-radius: 25px;
                 font-size: 16px;
                 font-weight: bold;
-            }
-            QPushButton:hover {
+                padding: 15px 30px;
+            }}
+            QPushButton:hover {{
                 background-color: #45a049;
-            }
+            }}
         """)
         self.start_stop_button.clicked.connect(self.toggle_automation)
         self.start_stop_button.clicked.connect(self.escolher_resolucao)
         buttons_layout.addWidget(self.start_stop_button)
-        
-        # Add logoff button
+
+        # Logoff Button with modern design
         self.logoff_button = QPushButton("Sair")
-        self.logoff_button.setMinimumWidth(180)  # Set minimum width
-        self.logoff_button.setStyleSheet("""
-            QPushButton {
-                background-color: #dc3545;
+        self.logoff_button.setMinimumWidth(250)
+        self.logoff_button.setMinimumHeight(50)
+        self.logoff_button.setCursor(Qt.PointingHandCursor)
+        self.logoff_button.setStyleSheet(f"""
+            QPushButton {{
+                background-color: {MODERN_STYLES['DANGER_COLOR']};
                 color: white;
                 border: none;
-                border-radius: 5px;
-                padding: 12px;
+                border-radius: 25px;
                 font-size: 16px;
                 font-weight: bold;
-            }
-            QPushButton:hover {
-                background-color: #c82333;
-            }
+                padding: 15px 30px;
+            }}
+            QPushButton:hover {{
+                background-color: #d32f2f;
+            }}
         """)
         self.logoff_button.clicked.connect(self.do_logoff)
         buttons_layout.addWidget(self.logoff_button)
 
-        buttons_layout.addStretch()  # Add stretch to keep buttons centered
-        content_layout.addWidget(buttons_container)
-
-        container_layout.addWidget(content_group)
+        # Add buttons container to main layout
+        container_layout.addWidget(buttons_container)
         container_layout.addStretch()
+
+        # Set the main layout
+        main_layout.addWidget(container)
+
+    def create_info_card(self, title, initial_value, label_name, accent_color):
+        card = QWidget()
+        card.setStyleSheet(f"""
+            QWidget {{
+                background: white;
+                border: 2px solid #e0e0e0;
+                border-radius: 15px;
+                padding: 10px;
+            }}
+        """)
+        
+        # Use horizontal layout for better spacing
+        layout = QHBoxLayout(card)
+        layout.setSpacing(10)
+        layout.setContentsMargins(15, 5, 15, 5)
+
+        # Create labels
+        title_label = QLabel(title)
+        title_label.setStyleSheet(f"""
+            font-size: 14px;
+            color: {accent_color};
+            font-weight: bold;
+        """)
+        title_label.setAlignment(Qt.AlignLeft | Qt.AlignVCenter)
+        
+        value_label = QLabel(initial_value)
+        value_label.setStyleSheet(f"""
+            font-size: 18px;
+            color: {MODERN_STYLES['TEXT_PRIMARY']};
+            font-weight: bold;
+        """)
+        value_label.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
+        
+        # Add labels to layout
+        layout.addWidget(title_label)
+        layout.addWidget(value_label)
+        setattr(self, label_name, value_label)
+        
+        return card
 
     def setup_config_tab(self):
         self.tab_configurar = QWidget()
@@ -837,7 +945,7 @@ class MainWindow(QMainWindow):
 
         # Verifica se usuário já está online
         online_status = self.db.check_user_online(username)
-        if online_status:
+        if (online_status):
             login_time = online_status["login_time"].strftime("%d/%m/%Y %H:%M:%S")
             reply = QMessageBox.question(
                 self,
@@ -865,7 +973,7 @@ class MainWindow(QMainWindow):
         self.login_thread.start()
 
     def handle_login_result(self, success, error_message):
-        if success:
+        if (success):
             # Adiciona usuário à collection de usuários online
             self.session_id = self.db.add_user_online(self.username_input.text().lower())
             if not self.session_id:
@@ -952,11 +1060,9 @@ class MainWindow(QMainWindow):
                 background-color: #c82333;
             }
         """)
-        self.status_label.setText("Status: Em execução")
 
         if self.automation_thread is None:
             self.automation_thread = AutomationThread(self)
-            self.automation_thread.status_update.connect(self.update_status)
             self.automation_thread.time_update.connect(self.update_time)
             self.automation_thread.battles_update.connect(self.update_battles)
             self.automation_thread.battles_per_minute_update.connect(self.update_battles_per_minute)
@@ -968,14 +1074,23 @@ class MainWindow(QMainWindow):
         self.update_time("00:00:00")
         self.update_battles(0)
         self.update_battles_per_minute(0.00)
-        self.start_stop_button.show()  # Mostra o botão "Parar Automação" ao final
+        self.start_stop_button.show()
 
     def stop_automation(self):
         if self.automation_thread:
-            self.automation_thread.stop()
-            self.automation_thread.terminate()
-            self.automation_thread.wait()
-            self.automation_thread = None
+            try:
+                self.automation_thread.is_running = False
+                self.automation_thread.stop()
+                if not self.automation_thread.wait(3000):
+                    self.automation_thread.terminate()
+                    self.automation_thread.wait()
+                self.automation_thread.deleteLater()
+                self.automation_thread = None
+            except Exception as e:
+                print(f"Error stopping automation: {e}")
+                if self.automation_thread:
+                    self.automation_thread.terminate()
+                    self.automation_thread = None
 
         self.app_state = APP_STATES['STOPPED']
         self.start_stop_button.setText("Iniciar Automação")
@@ -993,11 +1108,9 @@ class MainWindow(QMainWindow):
                 background-color: #45a049;
             }
         """)
-        # Mostra ambos os botões quando a automação é parada
+        
         self.start_stop_button.show()
         self.logoff_button.show()
-        
-        self.status_label.setText("Status: Parado")
         self.update_time("00:00:00")
         self.update_battles(0)
         self.update_battles_per_minute(0.00)
@@ -1010,7 +1123,7 @@ class MainWindow(QMainWindow):
             return
 
         largura, altura = map(int, resolucao_selecionada.split("x"))
-        
+
         hwnd = win32gui.FindWindow(None, 'Digimon SuperRumble  ')
         if hwnd == 0:
             QMessageBox.warning(self, "Erro", "Janela 'Digimon SuperRumble' não encontrada.")
@@ -1069,7 +1182,7 @@ class MainWindow(QMainWindow):
         except Exception as e:
             print(f"Erro ao capturar a tela: {e}")
             return None
-        
+
     def update_battle_key(self, key, group):
         button = self.sender()
         is_checked = button.isChecked()
@@ -1085,7 +1198,7 @@ class MainWindow(QMainWindow):
         # Uncheck other buttons in the same group
         parent = button.parent()
         for other_button in parent.findChildren(KeyButton):
-            if other_button != button and other_button.property('group') == group:
+            if (other_button != button and other_button.property('group') == group):
                 other_button.setChecked(False)
 
         # Print current state of battle keys
@@ -1095,7 +1208,7 @@ class MainWindow(QMainWindow):
         os.makedirs(SCREENSHOTS_DIR, exist_ok=True)
         for i, card in enumerate(self.cards):
             image_path = os.path.join(SCREENSHOTS_DIR, self.image_filenames[i])
-            if os.path.exists(image_path):
+            if (os.path.exists(image_path)):
                 imagem = QImage(image_path)
                 pixmap = QPixmap.fromImage(imagem)
                 scaled_pixmap = pixmap.scaled(150, 100, Qt.KeepAspectRatio, Qt.SmoothTransformation)
@@ -1106,12 +1219,12 @@ class MainWindow(QMainWindow):
             QMessageBox.warning(self, "Erro", "Sessão inválida, por favor faça login novamente")
             sys.exit()  # Encerra completamente o programa
             return False
-        
+
         if not self.db.validate_session(self.current_user, self.session_id):
             QMessageBox.warning(self, "Erro", "Sessão inválida, por favor faça login novamente")
             sys.exit()  # Encerra completamente o programa
             return False
-            
+
         return True
 
     def do_logoff(self):
@@ -1140,7 +1253,7 @@ class MainWindow(QMainWindow):
             self.license_info_label.setText("Informações da licença não disponíveis")
 
     def update_status(self, message):
-        self.status_label.setText(f"Status: {message}")
+        pass  # Status updates removed since status card was removed
 
     def update_time(self, time_str):
         self.time_label.setText(f"Tempo decorrido: {time_str}")
@@ -1150,4 +1263,3 @@ class MainWindow(QMainWindow):
 
     def update_battles_per_minute(self, battles_per_minute):
         self.battles_per_minute_label.setText(f"Batalhas por minuto: {battles_per_minute:.2f}")
-```
