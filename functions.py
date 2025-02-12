@@ -164,15 +164,18 @@ def battle_actions(battle_detection_image, battle_finish_image, battle_keys):
     """Execute battle actions"""
     log("Executando ações de batalha.")
     while is_image_on_screen(battle_detection_image):
-        if battle_keys['group1']:
-            pyautogui.press(battle_keys['group1'].lower())
-            pyautogui.press("1")
-        if battle_keys['group2']:
-            pyautogui.press(battle_keys['group2'].lower())
-            pyautogui.press("1")
-        if battle_keys['group3']:
-            pyautogui.press(battle_keys['group3'].lower())
-            pyautogui.press("1")
+        if not is_image_on_screen(IMAGE_PATHS['skill1']):
+            if battle_keys['group1']:
+                pyautogui.press(battle_keys['group1'].lower())
+                pyautogui.press("1")
+        if not is_image_on_screen(IMAGE_PATHS['skill2']):
+            if battle_keys['group2']:
+                pyautogui.press(battle_keys['group2'].lower())
+                pyautogui.press("1")
+        if not is_image_on_screen(IMAGE_PATHS['skill3']):
+            if battle_keys['group3']:
+                pyautogui.press(battle_keys['group3'].lower())
+                pyautogui.press("1")
 
     log("Batalha finalizada.")
     while not is_image_on_screen(battle_finish_image):

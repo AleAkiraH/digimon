@@ -961,7 +961,6 @@ class MainWindow(QMainWindow):
         coords_text = f"Região: {coords[0]}, {coords[1]} → {coords[2]}, {coords[3]}"
         coords_label = QLabel(coords_text)
         coords_label.setProperty("coords", True)
-        coords_label.setObjectName("coords_label")
         layout.addWidget(coords_label)
         
         # Preview
@@ -1317,10 +1316,10 @@ class MainWindow(QMainWindow):
         self.time_label.setText(f"Tempo decorrido: {time_str}")
 
     def update_battles(self, battles):
-        self.battles_per_minute_label.setText(f"Batalhas por minuto: {battles_per_minute:.2f}")
+        self.battles_label.setText(f"Batalhas realizadas: {battles}")
 
     def update_battles_per_minute(self, bpm):
-        self.battles_per_minute_label.setText(f"{bpm:.2f}/min")
+        self.battles_per_minute_label.setText(f"Taxa: {bpm:.2f}/min")
 
     def _create_capture_card(self, index, description, coords):
         card = QFrame()
