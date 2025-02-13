@@ -178,15 +178,14 @@ class AutomationThread(QThread):
                             x, y = location
                             pyautogui.click(x, y)
                             time.sleep(0.5)
-                            pyautogui.press('e')
 
                     battle_start_image_HP_Try = 3
-                    while not is_image_on_screen(IMAGE_PATHS['battle_start_hp']) and self.is_running and not self.is_paused:
+                    while not is_image_on_screen(IMAGE_PATHS['battle_start_hp'], region=(503, 377, 596, 393)) and self.is_running and not self.is_paused:
                         if is_image_on_screen(IMAGE_PATHS['captcha_exists']):
                             dividir_e_desenhar_contornos(self.main_window.current_user)
                         if battle_start_image_HP_Try == 0:
                             self.status_update.emit("Imagem de inicio de batalha não encontrada.")
-                            if not is_image_on_screen(IMAGE_PATHS['janela_digimon']):
+                            if not is_image_on_screen(IMAGE_PATHS['janela_digimon'], region=(503, 192, 666, 203)):
                                 pyautogui.press('v')                        
                             break
                         battle_start_image_HP_Try -= 1
@@ -198,19 +197,15 @@ class AutomationThread(QThread):
                     time.sleep(1)
                     self.status_update.emit("Buscando imagem de inicio de batalha")
                     
-                    if all(is_image_on_screen(IMAGE_PATHS[img]) for img in ['battle_start_hp', 'battle_start_sp', 'battle_start_evp']):
-                        self.status_update.emit("Imagem de início de batalha detectada.")                
-                        pyautogui.press('i')
+                    if all(is_image_on_screen(IMAGE_PATHS[img], region=self.main_window.coordenadas[idx]) for img, idx in [('battle_start_hp', 0), ('battle_start_sp', 1), ('battle_start_evp', 2)]):
+                        self.status_update.emit("Imagem de início de batalha detectada.")                       
                         self.status_update.emit("Procurando batalha: pressionando 'F'.")
                         if is_image_on_screen(IMAGE_PATHS['captcha_exists']):
                             dividir_e_desenhar_contornos(self.main_window.current_user)
                         time.sleep(1)
-                        initiate_battle(IMAGE_PATHS['battle_detection'], self.main_window.battle_keys)
-                        
-                        if is_image_on_screen(IMAGE_PATHS['captcha_exists']):
-                            dividir_e_desenhar_contornos(self.main_window.current_user)
+                        initiate_battle(self.main_window.battle_keys)
                             
-                        battle_actions(IMAGE_PATHS['battle_detection'], IMAGE_PATHS['battle_finish'], self.main_window.battle_keys)
+                        battle_actions(self.main_window.battle_keys, self.main_window.skill_positions)
                         self.battles_count += 1
                         current_time = datetime.now()
                         elapsed_time = (current_time - self.start_time).total_seconds() / 60  # in minutes
@@ -220,7 +215,7 @@ class AutomationThread(QThread):
                         if is_image_on_screen(IMAGE_PATHS['captcha_exists']):
                             dividir_e_desenhar_contornos(self.main_window.current_user)
                     else:
-                        if not is_image_on_screen(IMAGE_PATHS['battle_start_evp']):
+                        if not is_image_on_screen(IMAGE_PATHS['battle_start_evp'], region=(503, 459, 521, 475)):
                             pyautogui.press('v')
                             for _ in range(35):
                                 if not self.is_running or self.is_paused:
@@ -326,7 +321,7 @@ class MainWindow(QMainWindow):
         self.MIN_CONTAINER_WIDTH = int(window_width * 0.9)
         self.MAX_CONTAINER_WIDTH = int(window_width * 0.95)
         
-        self.setWindowTitle("Automação Digimon")
+        self.setWindowTitle("DigiBOT")
         self.setStyleSheet(f"""
             QMainWindow {{
                 background-color: {MODERN_STYLES['BACKGROUND_COLOR']};
@@ -486,7 +481,7 @@ class MainWindow(QMainWindow):
         main_layout.addWidget(container)
 
         # Logo and title with modern styling
-        title_label = QLabel("Automação Digimon")
+        title_label = QLabel("DigiBOT")
         title_label.setStyleSheet(f"""
             font-size: 36px;
             font-weight: bold;
@@ -618,7 +613,7 @@ class MainWindow(QMainWindow):
         """)
 
         # Header content
-        title_label = QLabel("Automação Digimon")
+        title_label = QLabel("DigiBOT")
         title_label.setStyleSheet("""
             font-size: 36px;
             font-weight: bold;
@@ -1424,10 +1419,7 @@ class MainWindow(QMainWindow):
             ("Barra de EVP", 2),
             ("Fim de Batalha", 3),
             ("Janela Digimon", 4),
-            ("Detecção de Batalha", 5),
-            ("Habilidade 1", 6),
-            ("Habilidade 2", 7),
-            ("Habilidade 3", 8)
+            ("Detecção de Batalha", 5)
         ]
 
         for i, (desc, idx) in enumerate(captures):

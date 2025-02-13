@@ -81,9 +81,13 @@ def activate_window(window_name):
         log("A janela não foi encontrada.")
         return None
 
-def is_image_on_screen(image_path, confidence=0.85):
+def is_image_on_screen(image_path, confidence=0.85, region=None):
     """Check if an image is present on screen"""
-    location = pyautogui.locateCenterOnScreen(image_path, confidence=confidence)
+    if region:
+        x1, y1, x2, y2 = region
+        location = pyautogui.locateCenterOnScreen(image_path, confidence=confidence, region=(x1, y1, x2 - x1, y2 - y1))
+    else:
+        location = pyautogui.locateCenterOnScreen(image_path, confidence=confidence)
     return location is not None
 
 def mover_mouse(x_inicial, y_inicial, x_final, y_final):
@@ -160,25 +164,26 @@ def dividir_e_desenhar_contornos(username):
         else:
             log("Falha ao localizar o quadrado azul na tela.")
 
-def battle_actions(battle_detection_image, battle_finish_image, battle_keys):
+def battle_actions(battle_keys, skill_coords):
     """Execute battle actions"""
     log("Executando ações de batalha.")
-    while is_image_on_screen(battle_detection_image):
-        if not is_image_on_screen(IMAGE_PATHS['skill1']):
-            if battle_keys['group1']:
-                pyautogui.press(battle_keys['group1'].lower())
-                pyautogui.press("1")
-        if not is_image_on_screen(IMAGE_PATHS['skill2']):
-            if battle_keys['group2']:
-                pyautogui.press(battle_keys['group2'].lower())
-                pyautogui.press("1")
-        if not is_image_on_screen(IMAGE_PATHS['skill3']):
-            if battle_keys['group3']:
-                pyautogui.press(battle_keys['group3'].lower())
-                pyautogui.press("1")
+    while is_image_on_screen(IMAGE_PATHS['battle_detection'], region=(768, 541, 779, 554)):
+        # if not is_image_on_screen(IMAGE_PATHS['skill1'], region=skill_coords['skill1']):
+        if battle_keys['group1']:
+            pyautogui.press(battle_keys['group1'].lower())
+            pyautogui.press("1")
+        # if not is_image_on_screen(IMAGE_PATHS['skill2'], region=skill_coords['skill2']):
+        if battle_keys['group2']:
+            pyautogui.press(battle_keys['group2'].lower())
+            pyautogui.press("1")
+        # if not is_image_on_screen(IMAGE_PATHS['skill3'], region=skill_coords['skill3']):
+        if battle_keys['group3']:
+            pyautogui.press(battle_keys['group3'].lower())
+            pyautogui.press("1")
+        time.sleep(3)
 
     log("Batalha finalizada.")
-    while not is_image_on_screen(battle_finish_image):
+    while not is_image_on_screen(IMAGE_PATHS['battle_finish'], region=(468, 565, 485, 576)):
         log("Aguardando para iniciar uma nova batalha.")
 
 def record_historical_action(username, action):
@@ -188,17 +193,17 @@ def record_historical_action(username, action):
     db.close()
     log(f"Ação '{action}' registrada para o usuário {username}.")
 
-def initiate_battle(battle_detection_image, battle_keys):    
-    while is_image_on_screen(IMAGE_PATHS['battle_finish']):
+def initiate_battle(battle_keys):    
+    while is_image_on_screen(IMAGE_PATHS['battle_finish'], region=(468, 565, 485, 576)):
         pyautogui.press('v')
-        log("Procurando batalha: pressionando 'F'.")        
+        log("Procurando batalha: pressionando 'F'.")
        
         for _ in range(20):
-            if is_image_on_screen(battle_detection_image):
+            if is_image_on_screen(IMAGE_PATHS['battle_detection'], region=(768, 541, 779, 554)):
                 break
             for _ in range(5):
                 pyautogui.press('g')
-            if not is_image_on_screen(IMAGE_PATHS['battle_finish']):
+            if not is_image_on_screen(IMAGE_PATHS['battle_finish'], region=(468, 565, 485, 576)):
                 if battle_keys['group1']:
                     pyautogui.press(battle_keys['group1'].lower())
                     pyautogui.press("1")
@@ -208,7 +213,7 @@ def initiate_battle(battle_detection_image, battle_keys):
                 if battle_keys['group3']:
                     pyautogui.press(battle_keys['group3'].lower())
                     pyautogui.press("1")
-            else:
+            else:                
                 pyautogui.press('f')
 
         if is_image_on_screen(IMAGE_PATHS['captcha_exists']):
