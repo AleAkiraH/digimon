@@ -194,32 +194,32 @@ def record_historical_action(username, action):
     log(f"Ação '{action}' registrada para o usuário {username}.")
 
 def initiate_battle(battle_keys):    
+    pyautogui.press('v')
     while is_image_on_screen(IMAGE_PATHS['battle_finish'], region=(468, 565, 485, 576)):
-        pyautogui.press('v')
-        log("Procurando batalha: pressionando 'F'.")
-       
-        for _ in range(20):
-            if is_image_on_screen(IMAGE_PATHS['battle_detection'], region=(768, 541, 779, 554)):
-                break
-            for _ in range(5):
-                pyautogui.press('g')
-            if not is_image_on_screen(IMAGE_PATHS['battle_finish'], region=(468, 565, 485, 576)):
-                if battle_keys['group1']:
-                    pyautogui.press(battle_keys['group1'].lower())
-                    pyautogui.press("1")
-                if battle_keys['group2']:
-                    pyautogui.press(battle_keys['group2'].lower())
-                    pyautogui.press("1")
-                if battle_keys['group3']:
-                    pyautogui.press(battle_keys['group3'].lower())
-                    pyautogui.press("1")
-            else:                
-                pyautogui.press('f')
-
+        
         if is_image_on_screen(IMAGE_PATHS['captcha_exists']):
             dividir_e_desenhar_contornos()
         
-        time.sleep(0.5)
+        log("Procurando batalha: pressionando 'F'.")
+        
+        if is_image_on_screen(IMAGE_PATHS['battle_detection'], region=(768, 541, 779, 554)):
+            break
+        
+        for _ in range(5):
+            pyautogui.press('g')
+            pyautogui.press('f')
+
+    while not is_image_on_screen(IMAGE_PATHS['battle_detection'], region=(768, 541, 779, 554)):
+        if battle_keys['group1']:
+            pyautogui.press(battle_keys['group1'].lower())
+            pyautogui.press("1")
+        if battle_keys['group2']:
+            pyautogui.press(battle_keys['group2'].lower())
+            pyautogui.press("1")
+        if battle_keys['group3']:
+            pyautogui.press(battle_keys['group3'].lower())
+            pyautogui.press("1")
+
     log("Batalha iniciada.")
 
 def refill_digimons(digivolucao_type='mega'):

@@ -202,7 +202,7 @@ class AutomationThread(QThread):
                         self.status_update.emit("Procurando batalha: pressionando 'F'.")
                         if is_image_on_screen(IMAGE_PATHS['captcha_exists']):
                             dividir_e_desenhar_contornos(self.main_window.current_user)
-                        time.sleep(1)
+                        time.sleep(0.5)
                         initiate_battle(self.main_window.battle_keys)
                             
                         battle_actions(self.main_window.battle_keys, self.main_window.skill_positions)
